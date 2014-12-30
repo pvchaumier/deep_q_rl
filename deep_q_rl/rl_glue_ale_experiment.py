@@ -16,8 +16,9 @@ usage: rl_glue_ale_experiment.py [-h] [--num_epochs NUM_EPOCHS]
 Author: Nathan Sprague
 
 """
+import sys, argparse
+
 import rlglue.RLGlue as RLGlue
-import argparse
 
 def run_epoch(epoch, num_steps, prefix):
     """ Run one 'epoch' of training or testing, where an epoch is defined
@@ -38,32 +39,32 @@ def run_epoch(epoch, num_steps, prefix):
         steps_left -= RLGlue.RL_num_steps()
 
 
-def main():
+def main(args):
     """
     Run the desired number of training epochs, a testing epoch
     is conducted after each training epoch.
     """
 
     parser = argparse.ArgumentParser(description='Neural rl experiment.')
-    parser.add_argument('--num_epochs', type=int, default=100,
-                        help='Number of training epochs')
-    parser.add_argument('--epoch_length', type=int, default=50000,
-                        help='Number of steps per epoch')
-    parser.add_argument('--test_length', type=int, default=10000,
-                        help='Number of steps per test')
-    args = parser.parse_args()
+    parser.add_argument('-e', '--epochs', dest="epochs", type=int, default=100,
+                        help='Number of training epochs (default: %(default)s)')
+    parser.add_argument('-s', '--steps-per-epoch', dest="steps_per_epoch", type=int, default=50000,
+                        help='Number of steps per epoch (default: %(default)s)')
+    parser.add_argument('-t', '--test-length', dest="test_steps", type=int, default=10000,
+                        help='Number of steps per test (default: %(default)s)')
+    parameters = parser.parse_args(args)
 
     RLGlue.RL_init()
 
-    for epoch in range(1, args.num_epochs + 1):
-        run_epoch(epoch, args.epoch_length, "training")
+    for epoch in xrange(1, parameters.epochs + 1):
+        run_epoch(epoch, parameters.steps_per_epoch, "training")
         RLGlue.RL_agent_message("finish_epoch " + str(epoch))
-        
-        if args.test_length > 0:
+
+        if parameters.test_steps > 0:
             RLGlue.RL_agent_message("start_testing")
-            run_epoch(epoch, args.test_length, "testing")
+            run_epoch(epoch, parameters.test_steps, "testing")
             RLGlue.RL_agent_message("finish_testing " + str(epoch))
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv[1:]))
