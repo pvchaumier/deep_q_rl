@@ -7,13 +7,17 @@ Antonoglou, Daan Wierstra, Martin Riedmiller
 
 Author: Nathan Sprague
 """
-import numpy as np
-import layers
-import cc_layers
-import theano
-import theano.tensor as T
+
+import logging
 import cPickle
 import copy
+
+import numpy as np
+import theano
+import theano.tensor as T
+
+import layers
+import cc_layers
 
 theano.config.exception_verbosity = 'high'
 
@@ -144,7 +148,7 @@ class CNNQLearner(object):
         self.q_layers.append(layers.OutputLayer(self.q_layers[-1]))
 
         for i in range(len(self.q_layers)-1):
-            print self.q_layers[i].get_output_shape()
+            logging.info("Layer %s: %s" % (i+1, self.q_layers[i].get_output_shape()))
 
 
         # Now create a network (using the same weights)

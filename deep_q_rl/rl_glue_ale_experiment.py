@@ -17,6 +17,7 @@ Author: Nathan Sprague
 
 """
 import sys, argparse
+import logging
 
 import rlglue.RLGlue as RLGlue
 
@@ -32,9 +33,10 @@ def run_epoch(epoch, num_steps, prefix):
     """
     steps_left = num_steps
     while steps_left > 0:
-        print prefix + " epoch: ", epoch, "steps_left: ", steps_left
+        logging.info("%s epoch: %s steps_left: %s" % (prefix, epoch, steps_left))
         terminal = RLGlue.RL_episode(steps_left)
         if not terminal:
+            # if we hadn't finished yet
             RLGlue.RL_agent_message("episode_end")
         steps_left -= RLGlue.RL_num_steps()
 
@@ -44,8 +46,12 @@ def main(args):
     Run the desired number of training epochs, a testing epoch
     is conducted after each training epoch.
     """
+    from logutils import setupLogging
 
     parser = argparse.ArgumentParser(description='Neural rl experiment.')
+    parser.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
+                      help="Verbosity.  Invoke many times for higher verbosity")
+
     parser.add_argument('-e', '--epochs', dest="epochs", type=int, default=100,
                         help='Number of training epochs (default: %(default)s)')
     parser.add_argument('-s', '--steps-per-epoch', dest="steps_per_epoch", type=int, default=50000,
@@ -53,6 +59,8 @@ def main(args):
     parser.add_argument('-t', '--test-length', dest="test_steps", type=int, default=10000,
                         help='Number of steps per test (default: %(default)s)')
     parameters = parser.parse_args(args)
+
+    setupLogging(parameters.verbosity)
 
     RLGlue.RL_init()
 

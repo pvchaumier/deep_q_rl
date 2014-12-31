@@ -26,14 +26,16 @@ def main(args):
     my_env = os.environ.copy()
     my_env["RLGLUE_PORT"] = str(parameters.glue_port)
 
+    close_fds = True
+
     full_rom_path = os.path.join(DefaultBaseROMPath, parameters.rom)
 
     # Start the necessary processes:
-    p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=True)
-    p2 = subprocess.Popen(['ale', '-game_controller', 'rlglue', '-frame_skip', '1', full_rom_path],
-                          env=my_env, close_fds=True)
-    p3 = subprocess.Popen(['./rl_glue_ale_experiment.py'], env=my_env, close_fds=True)
-    p4 = subprocess.Popen(['./dummy_agent.py'] + sys.argv[1:], env=my_env, close_fds=True)
+    p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
+    p2 = subprocess.Popen(['ale', '-game_controller', 'rlglue', '-frame_skip', '2', '-disable_color_averaging','true', full_rom_path],
+                          env=my_env, close_fds=close_fds)
+    p3 = subprocess.Popen(['./rl_glue_ale_experiment.py', '-vv', '-s', '50000', '-t', '10000'], env=my_env, close_fds=close_fds)
+    p4 = subprocess.Popen(['./rl_glue_ale_agent.py', '-vv'] + unknown, env=my_env, close_fds=close_fds)
 
     p1.wait()
     p2.wait()

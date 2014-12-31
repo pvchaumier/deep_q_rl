@@ -30,6 +30,10 @@
 # Some Modifications by Nathan Sprague 8/14
 
 
+import logging
+import sys
+import os
+
 import numpy as np
 import theano.tensor as T
 import theano
@@ -37,8 +41,6 @@ from theano.tensor.signal.conv import conv2d as sconv2d
 from theano.tensor.signal.downsample import max_pool_2d
 from theano.tensor.nnet.conv import conv2d
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
-import sys
-import os
 import cPickle as pickle
 
 
@@ -606,10 +608,10 @@ class ConvLayer(object):
 class StridedConvLayer(object):
     def __init__(self, input_layer, n_filters, filter_length, stride, weights_std, init_bias_value, nonlinearity=rectify, dropout=0.):
         if filter_length % stride != 0:
-            print 'ERROR: the filter_length should be a multiple of the stride '
+            logging.error('ERROR: the filter_length should be a multiple of the stride ')
             raise
         if stride == 1:
-            print 'ERROR: use the normal ConvLayer instead (stride=1) '
+            logging.error('ERROR: use the normal ConvLayer instead (stride=1) ')
             raise
 
         self.n_filters = n_filters
@@ -660,12 +662,12 @@ class StridedConvLayer(object):
         r_input = input_truncated.reshape(r_input_shape)
 
         if self.stride == self.filter_length:
-            print " better use a tensordot"
+            logging.warn(" better use a tensordot")
             # r_input = r_input.dimshuffle(0, 2, 1, 3) # (mb size, length/stride, #out, stride)
             conved = T.tensordot(r_input, self.W, np.asarray([[1, 3], [1, 2]]))
             conved = conved.dimshuffle(0, 2, 1)
         elif self.stride == self.filter_length / 2:
-            print " better use two tensordots"
+            logging.warn(" better use two tensordots")
             # define separate shapes for the even and odd parts, as they may differ depending on whether the sequence length
             # is an even or an odd multiple of the stride.
             length_even = input_shape[2] // self.filter_length
