@@ -65,27 +65,29 @@ class NeuralAgent(Agent):
     DefaultEpsilonStart = 1.0
     DefaultEpsilonMin = 0.1
     DefaultEpsilonDecay = 1000000
+    DefaultTestingEpsilon = 0.05
     DefaultHistoryLength = 4
     DefaultHistoryMax = 1000000
     DefaultBatchSize = 32
     DefaultPauseTime = 0
 
-    def __init__(self, learning_rate,
-        batch_size,
-        discount,
-        experiment_prefix,
-        nn_file,
-        pause,
-        epsilon_start,
-        epsilon_min,
-        epsilon_decay,
-        history_length,
-        max_history):
+    def __init__(self, learning_rate=DefaultLearningRate,
+        batch_size=DefaultBatchSize,
+        discount_rate=DefaultDiscountRate,
+        experiment_prefix='',
+        nn_file=None,
+        pause=DefaultPauseTime,
+        epsilon_start=DefaultEpsilonStart,
+        epsilon_min=DefaultEpsilonMin,
+        epsilon_decay=DefaultEpsilonDecay,
+        testing_epsilon=DefaultTestingEpsilon,
+        history_length=DefaultHistoryLength,
+        max_history=DefaultHistoryMax):
 
 
         self.learning_rate=learning_rate
         self.batch_size=batch_size
-        self.discount=discount
+        self.discount=discount_rate
         self.experiment_prefix=experiment_prefix
         self.nn_file=nn_file
         self.pause=pause
@@ -94,6 +96,7 @@ class NeuralAgent(Agent):
         self.epsilon_decay=epsilon_decay
         self.phi_length=history_length
         self.max_history=max_history
+        self.testing_epsilon = testing_epsilon
 
 
         # CREATE A FOLDER TO HOLD RESULTS
@@ -329,7 +332,7 @@ class NeuralAgent(Agent):
         if self.testing:
             self.episode_images.append(raw_image)
             self.episode_reward += reward
-            int_action = self._choose_action(self.test_data_set, .05,
+            int_action = self._choose_action(self.test_data_set, self.testing_epsilon,
                                              current_image, np.clip(reward, -1, 1))
             if self.pause > 0:
                 time.sleep(self.pause)
@@ -501,7 +504,7 @@ def main(args):
     parser.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float,
         default=NeuralAgent.DefaultLearningRate,
         help='Learning rate (default: %(default)s)')
-    parser.add_argument("-d", '--discount', dest="discount", type=float, default=NeuralAgent.DefaultDiscountRate,
+    parser.add_argument("-d", '--discount', dest="discount_rate", type=float, default=NeuralAgent.DefaultDiscountRate,
                         help='Discount rate (default: %(default)s)')
     parser.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=NeuralAgent.DefaultBatchSize,
         help='Batch size (default: %(default)s)')
@@ -530,7 +533,7 @@ def main(args):
 
     AgentLoader.loadAgent(NeuralAgent(learning_rate=parameters.learning_rate,
         batch_size=parameters.batch_size,
-        discount=parameters.discount,
+        discount_rate=parameters.discount_rate,
         experiment_prefix=parameters.experiment_prefix,
         nn_file=parameters.nn_file,
         pause=parameters.pause,
