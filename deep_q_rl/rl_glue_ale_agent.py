@@ -169,6 +169,7 @@ class NeuralAgent(Agent):
 
         self.step_counter = 0
         self.episode_counter = 0
+        self.episode_reward = 0
         self.batch_counter = 0
 
         self.holdout_data = None
@@ -179,6 +180,9 @@ class NeuralAgent(Agent):
         self.last_image = None
         self.last_action = None
 
+        # Images for keeping best-looking runs
+        self.episode_images = []
+        self.best_run_images = []
 
 
     def _init_network(self):
@@ -202,7 +206,7 @@ class NeuralAgent(Agent):
         logging.info("OPENING %s" % results_filename)
         self.results_file = open(results_filename, 'w')
         self.results_file.write(\
-            'epoch,num_episodes,total_reward,reward_per_epoch,mean_q\n')
+            'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q\n')
 
     def _open_learning_file(self):
         learning_filename = os.path.join(self.experiment_directory, 'learning.csv')
@@ -210,8 +214,8 @@ class NeuralAgent(Agent):
         self.learning_file.write('mean_loss,epsilon\n')
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
-        out = "{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
-                                  self.total_reward / float(num_episodes),
+        out = "{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
+                                  self.total_reward / float(num_episodes), self.best_epoch_reward,
                                   holdout_sum)
         self.results_file.write(out)
         self.results_file.flush()
@@ -239,6 +243,7 @@ class NeuralAgent(Agent):
 
         self.step_counter = 0
         self.batch_counter = 0
+        self.episode_reward = 0
 
         # We report the mean loss for every epoch.
         self.loss_averages = []
@@ -250,7 +255,9 @@ class NeuralAgent(Agent):
 
         self.last_action = copy.deepcopy(return_action)
 
-        self.last_image = self._resize_observation(observation.intArray)
+        self.last_image, raw_image = self.preprocess_observation(observation.intArray)
+        if self.testing:
+            self.episode_images = [raw_image]
 
         return return_action
 
@@ -266,7 +273,10 @@ class NeuralAgent(Agent):
             plt.grid(color='r', linestyle='-', linewidth=1)
         plt.show()
 
-    def _resize_observation(self, observation):
+    def preprocess_observation(self, observation):
+        """
+        Return a processed version of the observation, and an image of the observation for record-keeping
+        """
 
         # reshape linear to original image size
         image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
@@ -294,7 +304,7 @@ class NeuralAgent(Agent):
 
         arrayed = np.asarray(greyscaled)
 
-        return arrayed
+        return arrayed, pilled
 
 
     def agent_step(self, reward, observation):
@@ -313,11 +323,12 @@ class NeuralAgent(Agent):
         self.step_counter += 1
         return_action = Action()
 
-        current_image = self._resize_observation(observation.intArray)
+        current_image, raw_image = self.preprocess_observation(observation.intArray)
 
         #TESTING---------------------------
         if self.testing:
-            self.total_reward += reward
+            self.episode_images.append(raw_image)
+            self.episode_reward += reward
             int_action = self._choose_action(self.test_data_set, .05,
                                              current_image, np.clip(reward, -1, 1))
             if self.pause > 0:
@@ -388,7 +399,11 @@ class NeuralAgent(Agent):
         total_time = time.time() - self.start_time
 
         if self.testing:
-            self.total_reward += reward
+            self.episode_reward += reward
+            if self.best_epoch_reward is None or self.episode_reward > self.best_epoch_reward:
+                self.best_epoch_reward = self.episode_reward
+                self.best_run_images = self.episode_images
+            self.total_reward += self.episode_reward
         else:
             logging.info("Simulated at a rate of {}/s \n Average loss: {}".format(\
                 self.batch_counter/total_time,
@@ -421,6 +436,8 @@ class NeuralAgent(Agent):
         to save data to the indicated file.
         """
 
+        logging.info("Received %s" % in_message)
+
         #WE NEED TO DO THIS BECAUSE agent_end is not called
         # we run out of steps.
         if in_message.startswith("episode_end"):
@@ -437,6 +454,7 @@ class NeuralAgent(Agent):
             self.testing = True
             self.total_reward = 0
             self.episode_counter = 0
+            self.best_epoch_reward = None
 
         elif in_message.startswith("finish_testing"):
             self.testing = False
@@ -453,8 +471,18 @@ class NeuralAgent(Agent):
 
             self._update_results_file(epoch, self.episode_counter,
                                       holdout_sum / holdout_size)
+            self.record_best_run(epoch)
         else:
             return "I don't know how to respond to your message"
+
+
+    def record_best_run(self, epoch):
+        recording_directory = os.path.join(self.experiment_directory, "bestof%s_%s" % (epoch, self.best_epoch_reward))
+        os.mkdir(recording_directory)
+
+        for index, image in enumerate(self.best_run_images):
+            full_name = os.path.join(recording_directory, "frame%06d.png" % index)
+            image.save(full_name)
 
 def main(args):
     """
