@@ -5,5 +5,5 @@ then
 else
    output=$1
 fi
-avconv -r 30 -i frame%06d.png $output
+avconv -r 15 -i frame%06d.png $output
 
