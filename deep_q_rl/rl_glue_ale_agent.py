@@ -38,7 +38,6 @@ import datetime
 from rlglue.agent.Agent import Agent
 from rlglue.agent import AgentLoader as AgentLoader
 from rlglue.types import Action
-from rlglue.types import Observation
 from rlglue.utils import TaskSpecVRLGLUE3
 
 import numpy as np
@@ -209,7 +208,7 @@ class NeuralAgent(Agent):
         logging.info("OPENING %s" % results_filename)
         self.results_file = open(results_filename, 'w')
         self.results_file.write(\
-            'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q\n')
+            'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q,mean_q_considered\n')
 
     def _open_learning_file(self):
         learning_filename = os.path.join(self.experiment_directory, 'learning.csv')
@@ -217,9 +216,9 @@ class NeuralAgent(Agent):
         self.learning_file.write('mean_loss,epsilon\n')
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
-        out = "{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
+        out = "{},{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
                                   self.total_reward / float(num_episodes), self.best_epoch_reward,
-                                  holdout_sum)
+                                  holdout_sum, float(self.episode_q) / self.episode_chosen_steps)
         self.results_file.write(out)
         self.results_file.flush()
 
@@ -247,6 +246,8 @@ class NeuralAgent(Agent):
         self.step_counter = 0
         self.batch_counter = 0
         self.episode_reward = 0
+        self.episode_q = 0
+        self.episode_chosen_steps = 0
 
         # We report the mean loss for every epoch.
         self.loss_averages = []
@@ -256,7 +257,7 @@ class NeuralAgent(Agent):
         return_action = Action()
         return_action.intArray = [this_int_action]
 
-        self.last_action = copy.deepcopy(return_action)
+        self.last_action = this_int_action
 
         self.last_image, raw_image = self.preprocess_observation(observation.intArray)
         if self.testing:
@@ -264,17 +265,6 @@ class NeuralAgent(Agent):
 
         return return_action
 
-
-    def _show_phis(self, phi1, phi2):
-        for p in range(self.phi_length):
-            plt.subplot(2, self.phi_length, p+1)
-            plt.imshow(phi1[p, :, :], interpolation='none', cmap="gray")
-            plt.grid(color='r', linestyle='-', linewidth=1)
-        for p in range(self.phi_length):
-            plt.subplot(2, self.phi_length, p+5)
-            plt.imshow(phi2[p, :, :], interpolation='none', cmap="gray")
-            plt.grid(color='r', linestyle='-', linewidth=1)
-        plt.show()
 
     def preprocess_observation(self, observation):
         """
@@ -332,8 +322,12 @@ class NeuralAgent(Agent):
         if self.testing:
             self.episode_images.append(raw_image)
             self.episode_reward += reward
-            int_action = self._choose_action(self.test_data_set, self.testing_epsilon,
+            int_action, max_q = self.choose_action(self.test_data_set, self.testing_epsilon,
                                              current_image, np.clip(reward, -1, 1))
+            if max_q is not None:
+                self.episode_chosen_steps += 1
+                self.episode_q += max_q
+
             if self.pause > 0:
                 time.sleep(self.pause)
 
@@ -342,38 +336,39 @@ class NeuralAgent(Agent):
             self.epsilon = max(self.epsilon_min,
                                self.epsilon - self.epsilon_rate)
 
-            int_action = self._choose_action(self.data_set, self.epsilon,
+            int_action, max_q = self.choose_action(self.data_set, self.epsilon,
                                              current_image, np.clip(reward, -1, 1))
 
             if len(self.data_set) > self.batch_size:
-                loss = self._do_training()
+                loss = self.do_training()
                 self.batch_counter += 1
                 self.loss_averages.append(loss)
 
         return_action.intArray = [int_action]
 
-        self.last_action = copy.deepcopy(return_action)
+        self.last_action = int_action
         self.last_image = current_image
 
         return return_action
 
-    def _choose_action(self, data_set, epsilon, current_image, reward):
+    def choose_action(self, data_set, epsilon, current_image, reward):
         """
         Add the most recent data to the data set and choose
         an action based on the current policy.
         """
 
         data_set.add_sample(self.last_image,
-                            self.last_action.intArray[0],
+                            self.last_action,
                             reward, False)
         if self.step_counter >= self.phi_length:
             phi = data_set.phi(current_image)
-            int_action = self.network.choose_action(phi, epsilon)
+            int_action, max_q = self.network.choose_action(phi, epsilon)
         else:
             int_action = self.randGenerator.randint(0, self.num_actions - 1)
-        return int_action
+            max_q = None
+        return int_action, max_q
 
-    def _do_training(self):
+    def do_training(self):
         """
         Returns the average loss for the current batch.
         May be overridden if a subclass needs to train the network
@@ -408,7 +403,8 @@ class NeuralAgent(Agent):
                 self.best_run_images = self.episode_images
             self.total_reward += self.episode_reward
         else:
-            logging.info("Simulated at a rate of {}/s \n Average loss: {}".format(\
+            logging.info("Simulated at a rate of {} frames/s ({} batches/s) \n Average loss: {}".format(\
+                self.step_counter / total_time,
                 self.batch_counter/total_time,
                 np.mean(self.loss_averages)))
 
@@ -416,7 +412,7 @@ class NeuralAgent(Agent):
 
             # Store the latest sample.
             self.data_set.add_sample(self.last_image,
-                                     self.last_action.intArray[0],
+                                     self.last_action,
                                      np.clip(reward, -1, 1),
                                      True)
 
@@ -467,13 +463,14 @@ class NeuralAgent(Agent):
             if self.holdout_data is None:
                 self.holdout_data = self.data_set.random_batch(holdout_size *
                                                           self.batch_size)[0]
+
             holdout_sum = 0
-            for i in range(holdout_size):
-                holdout_sum += np.mean(
+            for i in range(holdout_size * self.batch_size):
+                holdout_sum += np.max(
                     self.network.q_vals(self.holdout_data[i, ...]))
 
             self._update_results_file(epoch, self.episode_counter,
-                                      holdout_sum / holdout_size)
+                                      holdout_sum / (holdout_size * self.batch_size))
             self.record_best_run(epoch)
         else:
             return "I don't know how to respond to your message"
@@ -486,6 +483,18 @@ class NeuralAgent(Agent):
         for index, image in enumerate(self.best_run_images):
             full_name = os.path.join(recording_directory, "frame%06d.png" % index)
             image.save(full_name)
+
+    def _show_phis(self, phi1, phi2):
+        for p in range(self.phi_length):
+            plt.subplot(2, self.phi_length, p+1)
+            plt.imshow(phi1[p, :, :], interpolation='none', cmap="gray")
+            plt.grid(color='r', linestyle='-', linewidth=1)
+        for p in range(self.phi_length):
+            plt.subplot(2, self.phi_length, p+5)
+            plt.imshow(phi2[p, :, :], interpolation='none', cmap="gray")
+            plt.grid(color='r', linestyle='-', linewidth=1)
+        plt.show()
+
 
 def main(args):
     """
