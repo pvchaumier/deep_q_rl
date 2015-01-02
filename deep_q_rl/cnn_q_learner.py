@@ -241,6 +241,7 @@ class CNNQLearner(object):
         # hidden layer
         self.q_layers[5].b.set_value(net.q_layers[5].b.get_value())
         self.q_layers[5].b.set_value(net.q_layers[5].b.get_value())
+        net_file.close()
 
 
     def q_vals(self, state):
@@ -259,9 +260,12 @@ class CNNQLearner(object):
         or return the optimal action. 
         """
         if np.random.random() < epsilon:
-            return np.random.randint(0, self.num_actions)
+            return np.random.randint(0, self.num_actions), None
         else:
-            return np.argmax(self.q_vals(state))
+            qvals = self.q_vals(state)
+            qmax = np.max(qvals)
+            max_action = np.argmax(qvals)
+            return max_action, qmax
 
     def train(self, states, actions, rewards, next_states,
               terminals, epochs=1):
