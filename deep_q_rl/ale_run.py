@@ -36,15 +36,21 @@ def main(args):
 
     close_fds = True
 
-    full_rom_path = os.path.join(DefaultBaseROMPath, parameters.rom)
+    if parameters.rom.endswith('.bin'):
+        rom = parameters.rom
+        game_name = parameters.rom[:-4]
+    else:
+        game_name = parameters.rom
+        rom = "%s.bin" % parameters.rom
+    full_rom_path = os.path.join(DefaultBaseROMPath, rom)
 
     # Start the necessary processes:
     p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
-    p2 = subprocess.Popen(['ale', '-game_controller', 'rlglue', '-frame_skip', '4', '-disable_color_averaging','true', full_rom_path],
+    p2 = subprocess.Popen(['ale', '-game_controller', 'rlglue', '-frame_skip', '4', full_rom_path],
                           env=my_env, close_fds=close_fds)
     p3 = subprocess.Popen(['./rl_glue_ale_experiment.py', '-vv', '--steps-per-epoch', str(parameters.steps_per_epoch), 
         '--test-length', str(parameters.test_steps), '--epochs', str(parameters.epochs)], env=my_env, close_fds=close_fds)
-    p4 = subprocess.Popen(['./rl_glue_ale_agent.py', '-vv'] + unknown, env=my_env, close_fds=close_fds)
+    p4 = subprocess.Popen(['./rl_glue_ale_agent.py', '-vv', '--experiment-prefix', game_name] + unknown, env=my_env, close_fds=close_fds)
 
     p1.wait()
     p2.wait()
