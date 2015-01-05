@@ -43,6 +43,7 @@ from rlglue.utils import TaskSpecVRLGLUE3
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+import cv2
 
 import cnn_q_learner
 import ale_data_set
@@ -169,6 +170,7 @@ class NeuralAgent(Agent):
         self._open_results_file()
         self._open_learning_file()
 
+        self.best_score_ever = None
         self.step_counter = 0
         self.episode_counter = 0
         self.episode_reward = 0
@@ -259,9 +261,13 @@ class NeuralAgent(Agent):
 
         self.last_action = this_int_action
 
-        self.last_image, raw_image = self.preprocess_observation(observation.intArray)
+        self.last_image, raw_image = self.preprocess_observation_original(observation.intArray)
         if self.testing:
-            self.episode_images = [raw_image]
+            if raw_image is not None:
+                self.episode_images = [raw_image]
+            else:
+                self.episod_images = []
+
 
         return return_action
 
@@ -300,6 +306,17 @@ class NeuralAgent(Agent):
         return arrayed, pilled
 
 
+    def preprocess_observation_original(self, observation):
+        image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
+        # convert from int32s
+        image = np.array(image, dtype=floatX)
+        greyscaled = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        resized = cv2.resize(greyscaled, (CROPPED_SIZE, CROPPED_SIZE),
+        interpolation=cv2.INTER_LINEAR)
+        uinted = np.array(resized, dtype='uint8')
+        return uinted, None
+
+
     def agent_step(self, reward, observation):
         """
         This method is called each time step.
@@ -316,11 +333,17 @@ class NeuralAgent(Agent):
         self.step_counter += 1
         return_action = Action()
 
-        current_image, raw_image = self.preprocess_observation(observation.intArray)
+        current_image, raw_image = self.preprocess_observation_original(observation.intArray)
+
+        #plt.imshow(current_image)
+        #plt.colorbar()
+        #plt.show()
+        #time.sleep(10)
 
         #TESTING---------------------------
         if self.testing:
-            self.episode_images.append(raw_image)
+            if raw_image is not None:
+                self.episode_images.append(raw_image)
             self.episode_reward += reward
             int_action, max_q = self.choose_action(self.test_data_set, self.testing_epsilon,
                                              current_image, np.clip(reward, -1, 1))
@@ -401,6 +424,10 @@ class NeuralAgent(Agent):
             if self.best_epoch_reward is None or self.episode_reward > self.best_epoch_reward:
                 self.best_epoch_reward = self.episode_reward
                 self.best_run_images = self.episode_images
+
+                if self.best_score_ever is None or self.episode_reward > self.best_score_ever:
+                    self.best_score_ever = self.episode_reward
+
             self.total_reward += self.episode_reward
         else:
             logging.info("Simulated at a rate of {} frames/s ({} batches/s) \n Average loss: {}".format(\
@@ -423,6 +450,8 @@ class NeuralAgent(Agent):
         here, but we use the agent_message mechanism instead so that
         a file name can be provided by the experiment.
         """
+
+        logging.info("Best score: %s" % self.best_score_ever)
 
         if self.learning_file:
             self.learning_file.close()
@@ -477,7 +506,7 @@ class NeuralAgent(Agent):
 
 
     def record_best_run(self, epoch):
-        recording_directory = os.path.join(self.experiment_directory, "bestof%s_%s" % (epoch, self.best_epoch_reward))
+        recording_directory = os.path.join(self.experiment_directory, "bestof%03d_%s" % (epoch, self.best_epoch_reward))
         os.mkdir(recording_directory)
 
         for index, image in enumerate(self.best_run_images):
