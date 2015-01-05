@@ -34,6 +34,8 @@ import random
 import argparse
 import logging
 import datetime
+import sys
+sys.setrecursionlimit(10000)
 
 from rlglue.agent.Agent import Agent
 from rlglue.agent import AgentLoader as AgentLoader
@@ -474,9 +476,9 @@ class NeuralAgent(Agent):
         elif in_message.startswith("finish_epoch"):
             epoch = int(in_message.split(" ")[1])
             network_filename = os.path.join(self.experiment_directory, 'network_file_%s.pkl' % epoch)
-            #net_file = open(network_filename, 'w')
-            #cPickle.dump(self.network, net_file, -1)
-            #net_file.close()
+            net_file = open(network_filename, 'w')
+            cPickle.dump(self.network, net_file, -1)
+            net_file.close()
 
         elif in_message.startswith("start_testing"):
             self.testing = True
