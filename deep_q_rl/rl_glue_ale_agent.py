@@ -101,6 +101,10 @@ class NeuralAgent(Agent):
         self.testing_epsilon = testing_epsilon
 
 
+        # We are going with a CV crop
+        self.preprocess_observation = self._preprocess_observation_cropped_by_cv
+        self.save_image = self._save_array
+
         # CREATE A FOLDER TO HOLD RESULTS
         time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
         if self.experiment_prefix:
@@ -274,7 +278,7 @@ class NeuralAgent(Agent):
         return return_action
 
 
-    def preprocess_observation(self, observation):
+    def _preprocess_observation_cropped_by_pil(self, observation):
         """
         Return a processed version of the observation, and an image of the observation for record-keeping
         """
@@ -308,15 +312,42 @@ class NeuralAgent(Agent):
         return arrayed, pilled
 
 
-    def preprocess_observation_original(self, observation):
+    def _preprocess_observation_cropped_by_cv(self, observation):
+        # reshape linear to original image size
         image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
         # convert from int32s
-        image = np.array(image, dtype=floatX)
+        image = np.array(image, dtype="uint8")
         greyscaled = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+        # resize and crop to a square
+        if IMAGE_HEIGHT > IMAGE_WIDTH:
+            resize_width = CROPPED_SIZE
+            resize_height = int(round(float(IMAGE_HEIGHT) * CROPPED_SIZE / IMAGE_WIDTH))
+        else:
+            resize_height = CROPPED_SIZE
+            resize_width = int(round(float(IMAGE_WIDTH) * CROPPED_SIZE / IMAGE_HEIGHT))
+
+        resized = cv2.resize(greyscaled, (resize_width, resize_height),
+        interpolation=cv2.INTER_LINEAR)
+
+        # We select the bottom part since that's where the action happens
+        # This makes a mockery of the bit above that is meant to be all general'n'shit
+        crop_y = resize_height - CROPPED_SIZE
+        cropped = resized[crop_y:resize_height, :]
+        #uinted = np.array(cropped, dtype='uint8')
+        return cropped, image
+
+
+
+    def _preprocess_observation_resized_by_cv(self, observation):
+        image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
+        # convert from int32s
+        floated = np.array(image, dtype=floatX)
+        greyscaled = cv2.cvtColor(floated, cv2.COLOR_RGB2GRAY)
         resized = cv2.resize(greyscaled, (CROPPED_SIZE, CROPPED_SIZE),
         interpolation=cv2.INTER_LINEAR)
         uinted = np.array(resized, dtype='uint8')
-        return uinted, None
+        return uinted, image
 
 
     def agent_step(self, reward, observation):
@@ -336,6 +367,30 @@ class NeuralAgent(Agent):
         return_action = Action()
 
         current_image, raw_image = self.preprocess_observation(observation.intArray)
+
+        # other_image, original_raw = self.preprocess_observation_cv(observation.intArray)
+
+        # pil_float = np.array(current_image, dtype=float)
+        # cv_float = np.array(original_processing_image, dtype=float)
+
+        # difference = np.abs(pil_float - cv_float)
+        # difference /= 255.0
+
+        # if self.step_counter > 3:
+        #     plt.imshow(difference)
+        #     plt.colorbar()
+        #     plt.show()
+
+        #     plt.imshow(pil_float)
+        #     plt.colorbar()
+        #     plt.show()
+
+        #     plt.imshow(cv_float)
+        #     plt.colorbar()
+        #     plt.show()
+
+        #     time.sleep(0.5)
+
 
         #plt.imshow(current_image)
         #plt.colorbar()
@@ -532,7 +587,14 @@ class NeuralAgent(Agent):
 
         for index, image in enumerate(self.best_run_images):
             full_name = os.path.join(recording_directory, "frame%06d.png" % index)
-            image.save(full_name)
+            self.save_image(image, full_name)
+
+    def _save_pil(self, image, filename):
+        image.save(filename)
+
+    def _save_array(self, image, filename):
+        # Need to swap the colour order since cv2 expects BGR
+        cv2.imwrite(filename, image[:,:,::-1])
 
     def _show_phis(self, phi1, phi2):
         for p in range(self.phi_length):
