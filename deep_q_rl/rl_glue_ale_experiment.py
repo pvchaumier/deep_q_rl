@@ -65,6 +65,7 @@ def main(args):
     RLGlue.RL_init()
 
     for epoch in xrange(1, parameters.epochs + 1):
+        RLGlue.RL_agent_message("start_epoch " + str(epoch))
         run_epoch(epoch, parameters.steps_per_epoch, "training")
         RLGlue.RL_agent_message("finish_epoch " + str(epoch))
 
