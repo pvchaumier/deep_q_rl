@@ -56,7 +56,7 @@ floatX = theano.config.floatX
 IMAGE_WIDTH = 160
 IMAGE_HEIGHT = 210
 
-CROPPED_SIZE = 80
+CROPPED_SIZE = 84
 
 
 class NeuralAgent(Agent):
@@ -221,8 +221,8 @@ class NeuralAgent(Agent):
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
         out = "{},{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
-                                  self.total_reward / float(num_episodes), self.best_epoch_reward,
-                                  holdout_sum, float(self.episode_q) / self.episode_chosen_steps)
+                                  self.total_reward / max(1.0, float(num_episodes)), self.best_epoch_reward,
+                                  holdout_sum, self.epoch_considered_q / max(1, self.epoch_considered_steps))
         self.results_file.write(out)
         self.results_file.flush()
 
@@ -263,7 +263,7 @@ class NeuralAgent(Agent):
 
         self.last_action = this_int_action
 
-        self.last_image, raw_image = self.preprocess_observation_original(observation.intArray)
+        self.last_image, raw_image = self.preprocess_observation(observation.intArray)
         if self.testing:
             if raw_image is not None:
                 self.episode_images = [raw_image]
@@ -335,12 +335,12 @@ class NeuralAgent(Agent):
         self.step_counter += 1
         return_action = Action()
 
-        current_image, raw_image = self.preprocess_observation_original(observation.intArray)
+        current_image, raw_image = self.preprocess_observation(observation.intArray)
 
         #plt.imshow(current_image)
         #plt.colorbar()
         #plt.show()
-        #time.sleep(10)
+        #time.sleep(0.4)
 
         #TESTING---------------------------
         if self.testing:
@@ -416,7 +416,6 @@ class NeuralAgent(Agent):
             None
         """
 
-        logging.info("agent end being called")
         self.episode_counter += 1
         self.step_counter += 1
         total_time = time.time() - self.start_time
@@ -460,6 +459,42 @@ class NeuralAgent(Agent):
         if self.results_file:
             self.results_file.close()
 
+
+    def _start_epoch(self, epoch):
+        pass
+
+    def _finish_epoch(self, epoch):
+        network_filename = os.path.join(self.experiment_directory, 'network_file_%s.pkl' % epoch)
+        net_file = open(network_filename, 'w')
+        cPickle.dump(self.network, net_file, -1)
+        net_file.close()
+
+    def _start_testing(self):
+        self.testing = True
+        self.total_reward = 0
+        self.episode_counter = 0
+        self.best_epoch_reward = None
+        self.epoch_considered_q = 0
+        self.epoch_considered_steps = 0
+
+
+    def _finish_testing(self, epoch):
+        self.testing = False
+        holdout_size = 3200
+
+        if self.holdout_data is None:
+            self.holdout_data = self.data_set.random_batch(holdout_size)[0]
+
+        holdout_sum = 0
+        for i in range(holdout_size):
+            holdout_sum += np.max(
+                self.network.q_vals(self.holdout_data[i, ...]))
+
+        self._update_results_file(epoch, self.episode_counter,
+                                  holdout_sum / holdout_size)
+        self.record_best_run(epoch)
+
+
     def agent_message(self, in_message):
         """
         The experiment will cause this method to be called.  Used
@@ -473,35 +508,20 @@ class NeuralAgent(Agent):
         if in_message.startswith("episode_end"):
             self.agent_end(0)
 
+        elif in_message.startswith("start_epoch"):
+            epoch = int(in_message.split(" ")[1])
+            self._start_epoch(epoch)
+
         elif in_message.startswith("finish_epoch"):
             epoch = int(in_message.split(" ")[1])
-            network_filename = os.path.join(self.experiment_directory, 'network_file_%s.pkl' % epoch)
-            net_file = open(network_filename, 'w')
-            cPickle.dump(self.network, net_file, -1)
-            net_file.close()
+            self._finish_epoch(epoch)
 
         elif in_message.startswith("start_testing"):
-            self.testing = True
-            self.total_reward = 0
-            self.episode_counter = 0
-            self.best_epoch_reward = None
+            self._start_testing()
 
         elif in_message.startswith("finish_testing"):
-            self.testing = False
-            holdout_size = 3200
-            epoch = int(in_message.split(" ")[1])
-
-            if self.holdout_data is None:
-                self.holdout_data = self.data_set.random_batch(holdout_size)[0]
-
-            holdout_sum = 0
-            for i in range(holdout_size):
-                holdout_sum += np.max(
-                    self.network.q_vals(self.holdout_data[i, ...]))
-
-            self._update_results_file(epoch, self.episode_counter,
-                                      holdout_sum / holdout_size)
-            self.record_best_run(epoch)
+            epoch = int(in_message.split(" ")[1])            
+            self._finish_testing(epoch)
         else:
             return "I don't know how to respond to your message"
 
