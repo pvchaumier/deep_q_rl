@@ -350,8 +350,8 @@ class NeuralAgent(Agent):
             int_action, max_q = self.choose_action(self.test_data_set, self.testing_epsilon,
                                              current_image, np.clip(reward, -1, 1))
             if max_q is not None:
-                self.episode_chosen_steps += 1
-                self.episode_q += max_q
+                self.epoch_considered_steps += 1
+                self.epoch_considered_q += max_q
 
             if self.pause > 0:
                 time.sleep(self.pause)
