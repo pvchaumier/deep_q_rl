@@ -1,8 +1,8 @@
 /* *****************************************************************************
  * A.L.E (Arcade Learning Environment)
- * Copyright (c) 2009-2013 by Yavar Naddaf, Joel Veness, Marc G. Bellemare and 
+ * Copyright (c) 2009-2013 by Yavar Naddaf, Joel Veness, Marc G. Bellemare and
  *   the Reinforcement Learning and Artificial Intelligence Laboratory
- * Released under the GNU General Public License; see License.txt for details. 
+ * Released under the GNU General Public License; see License.txt for details.
  *
  * Based on: Stella  --  "An Atari 2600 VCS Emulator"
  * Copyright (c) 1995-2007 by Bradford W. Mott and the Stella team
@@ -27,8 +27,8 @@
 
 // How many observation dimensions
 //#define NUM_OBSERVATION_DIMENSIONS (128 + 210*160)
-//modified nrs 8/9/13
-#define NUM_OBSERVATION_DIMENSIONS (105*80)
+//modified AD 2014/12/31
+#define NUM_OBSERVATION_DIMENSIONS (210*160*3)
 
 RLGlueController::RLGlueController(OSystem* _osystem) :
   ALEController(_osystem) {
@@ -42,7 +42,7 @@ void RLGlueController::run() {
   // First perform handshaking
   initRLGlue();
 
-  // Main loop 
+  // Main loop
   rlGlueLoop();
 
   // Cleanly terminate RL-Glue
@@ -62,8 +62,8 @@ void RLGlueController::initRLGlue() {
   short port = kDefaultPort;
 
   const char* envptr = 0;
- 
-  envptr = getenv("RLGLUE_PORT");  
+
+  envptr = getenv("RLGLUE_PORT");
   if (envptr != 0) {
     port = strtol(envptr, 0, 10);
     if (port == 0) {
@@ -129,30 +129,30 @@ void RLGlueController::rlGlueLoop() {
     rlSendBufferData(m_connection, &m_buffer, envState);
 
     display();
-  } 
+  }
 }
 
 /** Initializes the environment; sends a 'task spec' */
 void RLGlueController::envInit() {
   unsigned int taskSpecLength = 0;
   unsigned int offset = 0;
- 
+
   // Possibly this should be one big snprintf.
   std::string taskSpec = std::string("") +
     "VERSION RL-Glue-3.0 "+
     "PROBLEMTYPE episodic "+
-    "DISCOUNTFACTOR 1 "+ // Goal is to maximize score... avoid unpleasant tradeoffs with 1 
-    //modified nrs 8/9/13
+    "DISCOUNTFACTOR 1 "+ // Goal is to maximize score... avoid unpleasant tradeoffs with 1
+    //modified AD 2014/12/31
     //"OBSERVATIONS INTS (128 0 255)(33600 0 127) "+ // RAM, then screen
-    "OBSERVATIONS INTS (8400 0 255) "+ // downsampled bw screen
-    //"ACTIONS INTS (0 17) "+ // Inactive PlayerB 
+    "OBSERVATIONS INTS (100800 0 255) "+ // RGB screen
+    //"ACTIONS INTS (0 17) "+ // Inactive PlayerB
     "ACTIONS INTS (0 17)(18 35) "+ // Two actions: player A and player B
-    "REWARDS (UNSPEC UNSPEC) "+ // While rewards are technically bounded, this is safer 
+    "REWARDS (UNSPEC UNSPEC) "+ // While rewards are technically bounded, this is safer
     "EXTRA Name: Arcade Learning Environment ";
 
   taskSpecLength = taskSpec.length();
- 
-  // Allocate...? 
+
+  // Allocate...?
   allocateRLStruct(&m_rlglue_action, 2, 0, 0);
   allocateRLStruct(&m_observation, NUM_OBSERVATION_DIMENSIONS, 0, 0);
 
@@ -178,20 +178,20 @@ void RLGlueController::envStart() {
 }
 
 /** Reads in an action, returns the next observation-reward-terminal tuple.
-  *  derived from onEnvStep(). */ 
+  *  derived from onEnvStep(). */
 void RLGlueController::envStep() {
   unsigned int offset = 0;
- 
+
   offset = rlCopyBufferToADT(&m_buffer, offset, &m_rlglue_action);
   __RL_CHECK_STRUCT(&m_rlglue_action);
 
   // We expect here an integer-valued action
   Action player_a_action = (Action)m_rlglue_action.intArray[0];
-  Action player_b_action = (Action)m_rlglue_action.intArray[1]; 
+  Action player_b_action = (Action)m_rlglue_action.intArray[1];
 
   // Filter out non-regular actions ... let RL-Glue deal with those
   filterActions(player_a_action, player_b_action);
- 
+
   // Pass these actions to ALE
   reward_t reward = applyActions(player_a_action, player_b_action);
 
@@ -232,44 +232,33 @@ void RLGlueController::envMessage() {
 }
 
 void RLGlueController::filterActions(Action& player_a_action, Action& player_b_action) {
-  if (player_a_action >= PLAYER_A_MAX) 
+  if (player_a_action >= PLAYER_A_MAX)
     player_a_action = PLAYER_A_NOOP;
-  if (player_b_action < PLAYER_B_NOOP || player_b_action >= PLAYER_B_MAX) 
+  if (player_b_action < PLAYER_B_NOOP || player_b_action >= PLAYER_B_MAX)
     player_b_action = PLAYER_B_NOOP;
 }
 
 reward_observation_terminal_t RLGlueController::constructRewardObservationTerminal(reward_t reward) {
   reward_observation_terminal_t ro;
-  
+
   int index = 0;
   //nrs - comment out ram
   //const ALERAM & ram = m_environment.getRAM();
   const ALEScreen & screen = m_environment.getScreen();
 
-  pixel_t cur_pixel;
-  int color_total = 0;
+  size_t arraySize = screen.arraySize();
+  pixel_t *screenArray = screen.getArray();
+
   int r, g, b;
 
-  for (size_t col = 0; col < screen.width() ; col += 2) 
-    {
-      for (size_t row = 0; row < screen.height() ; row += 2)
-	{
-	  color_total = 0;
-	  for (int i = 0; i < 2; i++)
-	    {
-	      for (int j = 0; j < 2; j++)
-		{
-		  cur_pixel = screen.get(row+i, col+j);
-		  m_osystem->p_export_screen->
-		    get_rgb_from_palette(cur_pixel, r, g, b);
-		  color_total += r + g + b;
-		}
-	    }
-	  color_total /= (4 * 3); //4 pixels, each with three color channels.
-	  m_observation.intArray[index++] = color_total;
-	}
-      
-    }
+  for (size_t i = 0; i < arraySize; i++)
+  {
+    m_osystem->p_export_screen->
+        get_rgb_from_palette(screenArray[i], r, g, b);
+    m_observation.intArray[index++] = r;
+    m_observation.intArray[index++] = g;
+    m_observation.intArray[index++] = b;
+  }
 
   ro.observation = &m_observation;
 
@@ -278,7 +267,7 @@ reward_observation_terminal_t RLGlueController::constructRewardObservationTermin
   ro.terminal = m_settings->isTerminal();
 
   __RL_CHECK_STRUCT(ro.observation)
-  
+
   return ro;
 }
 
@@ -289,7 +278,7 @@ RLGlueController::RLGlueController(OSystem* system):
 }
 
 void RLGlueController::run() {
-  std::cerr << "RL-Glue interface unavailable. Please recompile with RL-Glue support." << 
+  std::cerr << "RL-Glue interface unavailable. Please recompile with RL-Glue support." <<
     std::endl;
 
   // We should return and terminate gracefully, since we can.
