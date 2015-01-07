@@ -13,7 +13,7 @@ DefaultBaseROMPath = "/usr/src/machinelearning/Arcade-Learning-Environment/roms/
 DefaultROM = 'breakout.bin'
 DefaultPort = 4096
 DefaultStepsPerEpoch = 50000
-DefaultEpochs = 100
+DefaultEpochs = 300
 DefaultStepsPerTest = 10000
 DefaultFrameSkip = 4
 
@@ -51,10 +51,6 @@ def main(args):
         rom = "%s.bin" % parameters.rom
     full_rom_path = os.path.join(DefaultBaseROMPath, rom)
 
-    if parameters.experiment_prefix is not None:
-        prefix = parameters.experiment_prefix
-    else:
-        prefix = game_name
 
     # Start the necessary processes:
     p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
@@ -65,7 +61,10 @@ def main(args):
     p2 = subprocess.Popen(command, env=my_env, close_fds=close_fds)
     p3 = subprocess.Popen(['./rl_glue_ale_experiment.py', '-vv', '--steps-per-epoch', str(parameters.steps_per_epoch), 
         '--test-length', str(parameters.test_steps), '--epochs', str(parameters.epochs)], env=my_env, close_fds=close_fds)
-    p4 = subprocess.Popen(['./rl_glue_ale_agent.py', '-vv', '--experiment-prefix', prefix] + unknown, env=my_env, close_fds=close_fds)
+    command = ['./rl_glue_ale_agent.py', '-vv', '--game-name', game_name]
+    if parameters.experiment_prefix:
+        command.extend(['--experiment-prefix', parameters.experiment_prefix])
+    p4 = subprocess.Popen(command + unknown, env=my_env, close_fds=close_fds)
 
     p1.wait()
     p2.wait()

@@ -46,10 +46,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 import cv2
+import theano
 
 import cnn_q_learner
 import ale_data_set
-import theano
+from gameactions import GameActions
 
 floatX = theano.config.floatX
 
@@ -73,7 +74,8 @@ class NeuralAgent(Agent):
     DefaultBatchSize = 32
     DefaultPauseTime = 0
 
-    def __init__(self, learning_rate=DefaultLearningRate,
+    def __init__(self, game_name,
+        learning_rate=DefaultLearningRate,
         batch_size=DefaultBatchSize,
         discount_rate=DefaultDiscountRate,
         experiment_prefix='',
@@ -87,6 +89,7 @@ class NeuralAgent(Agent):
         max_history=DefaultHistoryMax):
 
 
+        self.game_name = game_name
         self.learning_rate=learning_rate
         self.batch_size=batch_size
         self.discount=discount_rate
@@ -107,10 +110,17 @@ class NeuralAgent(Agent):
 
         # CREATE A FOLDER TO HOLD RESULTS
         time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+        prefices = []
         if self.experiment_prefix:
-            experiment_prefix = "%s_" % self.experiment_prefix
+            prefices.append(experiment_prefix)
+        if self.game_name:
+            prefices.append(self.game_name)
+
+        if prefices:
+            experiment_prefix = "%s_" % "_".join(prefices)
         else:
-            experiment_prefix = self.experiment_prefix
+            experiment_prefix = ''
+
         self.experiment_directory = "%s%s_%s_%s" % (experiment_prefix, time_str, str(self.learning_rate).replace(".", "p"), str(self.discount).replace(".", "p"))
 
         logging.info("Experiment directory: %s" % self.experiment_directory)
@@ -144,9 +154,12 @@ class NeuralAgent(Agent):
                 " expecting min action to be a number not a special value"
             assert not TaskSpec.isSpecial(TaskSpec.getIntActions()[0][1]), \
                 " expecting max action to be a number not a special value"
-            self.num_actions = TaskSpec.getIntActions()[0][1]+1
         else:
             logging.error("INVALID TASK SPEC")
+
+
+        self.game_actions = GameActions[self.game_name]
+        self.num_actions = len(self.game_actions)
 
         self.data_set = ale_data_set.DataSet(width=CROPPED_SIZE,
                                              height=CROPPED_SIZE,
@@ -263,7 +276,7 @@ class NeuralAgent(Agent):
         self.start_time = time.time()
         this_int_action = self.randGenerator.randint(0, self.num_actions-1)
         return_action = Action()
-        return_action.intArray = [this_int_action]
+        return_action.intArray = [self.game_actions[this_int_action]]
 
         self.last_action = this_int_action
 
@@ -424,7 +437,8 @@ class NeuralAgent(Agent):
                 self.batch_counter += 1
                 self.loss_averages.append(loss)
 
-        return_action.intArray = [int_action]
+        # Map it back to ALE's actions
+        return_action.intArray = [self.game_actions[int_action]]
 
         self.last_action = int_action
         self.last_image = current_image
@@ -621,7 +635,8 @@ def main(args):
     parser = argparse.ArgumentParser(description='Neural rl agent.')
     parser.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
                       help="Verbosity.  Invoke many times for higher verbosity")
-
+    parser.add_argument("-g", '--game-name', dest="game_name", default=None,
+        help='Name of the game')
     parser.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float,
         default=NeuralAgent.DefaultLearningRate,
         help='Learning rate (default: %(default)s)')
@@ -652,7 +667,8 @@ def main(args):
 
     setupLogging(parameters.verbosity)
 
-    AgentLoader.loadAgent(NeuralAgent(learning_rate=parameters.learning_rate,
+    AgentLoader.loadAgent(NeuralAgent(parameters.game_name,
+        learning_rate=parameters.learning_rate,
         batch_size=parameters.batch_size,
         discount_rate=parameters.discount_rate,
         experiment_prefix=parameters.experiment_prefix,
