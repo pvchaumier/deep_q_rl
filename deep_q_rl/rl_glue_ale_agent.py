@@ -52,9 +52,6 @@ import cnn_q_learner
 import ale_data_set
 from gameactions import GameActions
 
-import sys
-sys.setrecursionlimit(10000)
-
 floatX = theano.config.floatX
 
 IMAGE_WIDTH = 160
