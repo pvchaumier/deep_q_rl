@@ -68,7 +68,7 @@ class NeuralAgent(Agent):
     DefaultEpsilonStart = 1.0
     DefaultEpsilonMin = 0.1
     DefaultEpsilonDecay = 1000000
-    DefaultTestingEpsilon = 0.05
+    DefaultTestingEpsilon = 0.01
     DefaultHistoryLength = 4
     DefaultHistoryMax = 1000000
     DefaultBatchSize = 32
