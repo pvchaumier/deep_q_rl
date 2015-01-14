@@ -35,9 +35,6 @@ def run_epoch(epoch, num_steps, prefix):
     while steps_left > 0:
         logging.info("%s epoch: %s steps_left: %s" % (prefix, epoch, steps_left))
         terminal = RLGlue.RL_episode(steps_left)
-        if not terminal:
-            # if we hadn't finished yet
-            RLGlue.RL_agent_message("episode_end")
         steps_left -= RLGlue.RL_num_steps()
 
 

@@ -474,7 +474,7 @@ class NeuralAgent(Agent):
                                   next_states, terminals)
 
 
-    def agent_end(self, reward):
+    def agent_end(self, reward, epoch_end=False):
         """
         This function is called once at the end of an episode.
 
@@ -484,6 +484,10 @@ class NeuralAgent(Agent):
         Returns:
             None
         """
+
+        if self.step_counter <= 0:
+            # Corner case where we get an end due to end of epoch just after a game ended
+            return
 
         self.episode_counter += 1
         self.step_counter += 1
@@ -506,6 +510,10 @@ class NeuralAgent(Agent):
                 np.mean(self.loss_averages)))
 
             self._update_learning_file()
+
+            if not epoch_end:
+                # if this is not just due to epoch end, then finishing a game is a bad thing
+                reward = -1
 
             # Store the latest sample.
             self.data_set.add_sample(self.last_image,
@@ -533,6 +541,8 @@ class NeuralAgent(Agent):
         pass
 
     def _finish_epoch(self, epoch):
+        self.agent_end(0, epoch_end=True)
+
         network_filename = os.path.join(self.experiment_directory, 'network_file_%s.pkl' % epoch)
         net_file = open(network_filename, 'w')
         cPickle.dump(self.network, net_file, -1)
@@ -548,6 +558,8 @@ class NeuralAgent(Agent):
 
 
     def _finish_testing(self, epoch):
+        self.agent_end(0, epoch_end=True)
+        
         self.testing = False
         holdout_size = 3200
 
@@ -572,12 +584,7 @@ class NeuralAgent(Agent):
 
         logging.info("Received %s" % in_message)
 
-        #WE NEED TO DO THIS BECAUSE agent_end is not called
-        # we run out of steps.
-        if in_message.startswith("episode_end"):
-            self.agent_end(0)
-
-        elif in_message.startswith("start_epoch"):
+        if in_message.startswith("start_epoch"):
             epoch = int(in_message.split(" ")[1])
             self._start_epoch(epoch)
 
