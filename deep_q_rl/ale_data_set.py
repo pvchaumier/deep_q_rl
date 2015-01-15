@@ -45,6 +45,9 @@ class DataSet(object):
         return max(0, self.count - self.max_steps)
 
     def _max_index(self):
+        """
+        Maximum index where we can return the index's phi and the next one
+        """
         return self.count - (self.phi_length + 1)
 
     def __len__(self):
