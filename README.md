@@ -26,13 +26,12 @@ Here is a video showing a trained network playing breakout:
 * A reasonably modern NVIDIA GPU
 * Cython
 * OpenCV
-* [Theano](http://deeplearning.net/software/theano/)
-* [Pylearn2](http://deeplearning.net/software/pylearn2/)
-* [Arcade Learning Environment](http://www.arcadelearningenvironment.org/)
-  This package requires a slightly modified version of ALE.  You'll
-  need to replace `rlglue_controller.cpp` with the provided version
-  before compiling.  This version handles down-sampling the image and
-  converting to gray-scale.
+* Each of the following should be installed from the master branches on github:
+  * [Theano](http://deeplearning.net/software/theano/) ([https://github.com/Theano/Theano](https://github.com/Theano/Theano))
+  * [Pylearn2](http://deeplearning.net/software/pylearn2/) ([https://github.com/lisa-lab/pylearn2](https://github.com/lisa-lab/pylearn2))
+  * [Arcade Learning Environment](http://www.arcadelearningenvironment.org/) ([https://github.com/mgbellemare/Arcade-Learning-Environment](https://github.com/mgbellemare/Arcade-Learning-Environment))
+
+     We need a slightly modified version of ALE.  You'll need to replace `rlglue_controller.cpp` with the provided version before compiling.  This version handles down-sampling the image and  converting to gray-scale.
 * [RL-Glue](http://glue.rl-community.org/wiki/Main_Page)
 * [RL-Glue Python Codec](http://glue.rl-community.org/wiki/Python_Codec)
 
@@ -55,6 +54,11 @@ After a couple of days, you can watch the trained network play using the
 
 `$ python ale_run_watch.py data_09-29-15-46_0p0001_0p9/network_file_99.pkl`
 
+# Getting Help
+
+The [deep Q-learning web-forum](https://groups.google.com/forum/#!forum/deep-q-learning)
+can be used for discussion and advice related to deep Q-learning in
+general and this package in particular.
 
 # See Also
 
@@ -62,6 +66,9 @@ After a couple of days, you can watch the trained network play using the
 
   This is a work in progress.  Their project is described here: 
   http://robohub.org/artificial-general-intelligence-that-plays-atari-video-games-how-did-deepmind-do-it/
+
+* https://github.com/muupan/dqn-in-the-caffe
+  Working Caffe-based implementation.  (I haven't tried it out, but there is a video of the agent playing Pong successfully.) 
 
 * https://github.com/brian473/neural_rl
 
