@@ -50,7 +50,6 @@ import theano
 
 import cnn_q_learner
 import ale_data_set
-from gameactions import GameActions
 
 floatX = theano.config.floatX
 
@@ -154,12 +153,10 @@ class NeuralAgent(Agent):
                 " expecting min action to be a number not a special value"
             assert not TaskSpec.isSpecial(TaskSpec.getIntActions()[0][1]), \
                 " expecting max action to be a number not a special value"
+            self.num_actions = TaskSpec.getIntActions()[0][1]+1
         else:
             logging.error("INVALID TASK SPEC")
 
-
-        self.game_actions = GameActions[self.game_name]
-        self.num_actions = len(self.game_actions)
 
         self.data_set = ale_data_set.DataSet(width=CROPPED_SIZE,
                                              height=CROPPED_SIZE,
@@ -276,7 +273,7 @@ class NeuralAgent(Agent):
         self.start_time = time.time()
         this_int_action = self.randGenerator.randint(0, self.num_actions-1)
         return_action = Action()
-        return_action.intArray = [self.game_actions[this_int_action]]
+        return_action.intArray = [this_int_action]
 
         self.last_action = this_int_action
 
@@ -405,10 +402,11 @@ class NeuralAgent(Agent):
         #     time.sleep(0.5)
 
 
-        #plt.imshow(current_image)
-        #plt.colorbar()
-        #plt.show()
-        #time.sleep(0.4)
+        # #if self.step_counter == 100:
+        #     plt.imshow(current_image)
+        #     plt.colorbar()
+        #     plt.show()
+        #     time.sleep(0.4)
 
         #TESTING---------------------------
         if self.testing:
@@ -438,7 +436,7 @@ class NeuralAgent(Agent):
                 self.loss_averages.append(loss)
 
         # Map it back to ALE's actions
-        return_action.intArray = [self.game_actions[int_action]]
+        return_action.intArray = [int_action]
 
         self.last_action = int_action
         self.last_image = current_image
@@ -511,10 +509,6 @@ class NeuralAgent(Agent):
 
             self._update_learning_file()
 
-            if not epoch_end:
-                # if this is not just due to epoch end, then finishing a game is a bad thing
-                reward = -1
-
             # Store the latest sample.
             self.data_set.add_sample(self.last_image,
                                      self.last_action,
@@ -559,7 +553,7 @@ class NeuralAgent(Agent):
 
     def _finish_testing(self, epoch):
         self.agent_end(0, epoch_end=True)
-        
+
         self.testing = False
         holdout_size = 3200
 
