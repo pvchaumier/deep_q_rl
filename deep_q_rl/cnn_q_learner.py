@@ -88,14 +88,14 @@ class CNNQLearner(object):
                                                  n_filters=16,
                                                  filter_size=8,
                                                  stride=4,
-                                                 weights_std=.01,
+                                                 weights_std=.02,
                                                  init_bias_value=0.1))
             self.q_layers.append(
                 cc_layers.CudaConvnetConv2DLayer(self.q_layers[-1],
                                                  n_filters=32,
                                                  filter_size=4,
                                                  stride=2,
-                                                 weights_std=.01,
+                                                 weights_std=.02,
                                                  init_bias_value=0.1))
             self.q_layers.append(cc_layers.ShuffleC01BToBC01Layer(
                     self.q_layers[-1]))
