@@ -54,7 +54,7 @@ def main(args):
 
     # Start the necessary processes:
     p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
-    command = ['ale', '-game_controller', 'rlglue', '-frame_skip', str(parameters.frame_skip)]
+    command = ['ale', '-game_controller', 'rlglue', '-restricted_action_set', 'true','-frame_skip', str(parameters.frame_skip)]
     if not parameters.merge_frames:
         command.extend(['-disable_color_averaging', 'true'])
     command.append(full_rom_path)
