@@ -44,17 +44,19 @@ from rlglue.utils import TaskSpecVRLGLUE3
 
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image
 import cv2
 import theano
 
 import cnn_q_learner
 import ale_data_set
+from playingarea import PlayingArea
 
 floatX = theano.config.floatX
 
 IMAGE_WIDTH = 160
 IMAGE_HEIGHT = 210
+
+assert IMAGE_HEIGHT > IMAGE_WIDTH
 
 CROPPED_SIZE = 84
 
@@ -204,6 +206,38 @@ class NeuralAgent(Agent):
         self.episode_images = []
         self.best_run_images = []
 
+        self._crop_y = self.calculate_y_crop_offset()
+        logging.info("Cropping at %s" % self._crop_y)
+
+
+    def calculate_y_crop_offset(self):
+        """
+        Calculate the y-offset where we are going to crop the image in the target size
+        """
+
+        if self.game_name:
+            playing_section = PlayingArea[self.game_name]
+        else:
+            playing_section = 'bottom'
+
+        pre_crop_height = int(round(float(IMAGE_HEIGHT) * CROPPED_SIZE / IMAGE_WIDTH))
+        shrink_factor = float(CROPPED_SIZE) / IMAGE_WIDTH
+
+        if playing_section == 'top':
+            return 0
+        elif playing_section == 'bottom':
+            return pre_crop_height - CROPPED_SIZE
+        elif playing_section in ['centre', 'center']:
+            return (pre_crop_height - CROPPED_SIZE) // 2
+        else:
+            # pixel counts
+            if playing_section >= 0:
+                return int(round(playing_section * shrink_factor))
+            else:
+                return pre_crop_height + int(round(playing_section * shrink_factor)) - CROPPED_SIZE
+
+
+
 
     def _init_network(self):
         """
@@ -288,39 +322,6 @@ class NeuralAgent(Agent):
         return return_action
 
 
-    def _preprocess_observation_cropped_by_pil(self, observation):
-        """
-        Return a processed version of the observation, and an image of the observation for record-keeping
-        """
-
-        # reshape linear to original image size
-        image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
-        # convert from int32s
-        image = np.array(image, dtype='uint8')
-
-        # convert to an image
-        pilled = Image.fromarray(image,'RGB')
-
-        # resize and crop to a square
-        if IMAGE_HEIGHT > IMAGE_WIDTH:
-            resize_width = CROPPED_SIZE
-            resize_height = int(round(float(IMAGE_HEIGHT) * CROPPED_SIZE / IMAGE_WIDTH))
-        else:
-            resize_height = CROPPED_SIZE
-            resize_width = int(round(float(IMAGE_WIDTH) * CROPPED_SIZE / IMAGE_HEIGHT))
-
-        resized = pilled.resize((resize_width, resize_height), Image.BILINEAR)
-
-        # We select the bottom part since that's where the action happens
-        # This makes a mockery of the bit above that is meant to be all general'n'shit
-        crop_y = resize_height - CROPPED_SIZE
-        cropped = resized.crop((0, crop_y, resize_width, resize_height))
-        greyscaled = cropped.convert('L')
-
-        arrayed = np.asarray(greyscaled)
-
-        return arrayed, pilled
-
 
     def _preprocess_observation_cropped_by_cv(self, observation):
         # reshape linear to original image size
@@ -329,22 +330,15 @@ class NeuralAgent(Agent):
         image = np.array(image, dtype="uint8")
         greyscaled = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
-        # resize and crop to a square
-        if IMAGE_HEIGHT > IMAGE_WIDTH:
-            resize_width = CROPPED_SIZE
-            resize_height = int(round(float(IMAGE_HEIGHT) * CROPPED_SIZE / IMAGE_WIDTH))
-        else:
-            resize_height = CROPPED_SIZE
-            resize_width = int(round(float(IMAGE_WIDTH) * CROPPED_SIZE / IMAGE_HEIGHT))
+        resize_width = CROPPED_SIZE
+        resize_height = int(round(float(IMAGE_HEIGHT) * CROPPED_SIZE / IMAGE_WIDTH))
 
         resized = cv2.resize(greyscaled, (resize_width, resize_height),
         interpolation=cv2.INTER_LINEAR)
 
-        # We select the bottom part since that's where the action happens
-        # This makes a mockery of the bit above that is meant to be all general'n'shit
-        crop_y = resize_height - CROPPED_SIZE
-        cropped = resized[crop_y:resize_height, :]
-        #uinted = np.array(cropped, dtype='uint8')
+        # We select a square section determined by the values set in playingarea
+        cropped = resized[self._crop_y:self._crop_y + CROPPED_SIZE, :]
+
         return cropped, image
 
 
@@ -402,7 +396,7 @@ class NeuralAgent(Agent):
         #     time.sleep(0.5)
 
 
-        # #if self.step_counter == 100:
+        # if 100 <= self.step_counter <= 108:
         #     plt.imshow(current_image)
         #     plt.colorbar()
         #     plt.show()
