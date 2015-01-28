@@ -143,6 +143,7 @@ class NeuralAgent(Agent):
                                       TaskSpecVRLGLUE3.TaskSpecParser
         """
         # DO SOME SANITY CHECKING ON THE TASKSPEC
+        logging.info("Task spec: %s" % task_spec_string)
         TaskSpec = TaskSpecVRLGLUE3.TaskSpecParser(task_spec_string)
         if TaskSpec.valid:
 
@@ -325,7 +326,7 @@ class NeuralAgent(Agent):
 
     def _preprocess_observation_cropped_by_cv(self, observation):
         # reshape linear to original image size
-        image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
+        image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
         # convert from int32s
         image = np.array(image, dtype="uint8")
         greyscaled = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -344,7 +345,7 @@ class NeuralAgent(Agent):
 
 
     def _preprocess_observation_resized_by_cv(self, observation):
-        image = observation.reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
+        image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
         # convert from int32s
         floated = np.array(image, dtype=floatX)
         greyscaled = cv2.cvtColor(floated, cv2.COLOR_RGB2GRAY)
@@ -371,30 +372,6 @@ class NeuralAgent(Agent):
         return_action = Action()
 
         current_image, raw_image = self.preprocess_observation(observation.intArray)
-
-        # other_image, original_raw = self.preprocess_observation_cv(observation.intArray)
-
-        # pil_float = np.array(current_image, dtype=float)
-        # cv_float = np.array(original_processing_image, dtype=float)
-
-        # difference = np.abs(pil_float - cv_float)
-        # difference /= 255.0
-
-        # if self.step_counter > 3:
-        #     plt.imshow(difference)
-        #     plt.colorbar()
-        #     plt.show()
-
-        #     plt.imshow(pil_float)
-        #     plt.colorbar()
-        #     plt.show()
-
-        #     plt.imshow(cv_float)
-        #     plt.colorbar()
-        #     plt.show()
-
-        #     time.sleep(0.5)
-
 
         # if 100 <= self.step_counter <= 108:
         #     plt.imshow(current_image)
@@ -598,8 +575,6 @@ class NeuralAgent(Agent):
             full_name = os.path.join(recording_directory, "frame%06d.png" % index)
             self.save_image(image, full_name)
 
-    def _save_pil(self, image, filename):
-        image.save(filename)
 
     def _save_array(self, image, filename):
         # Need to swap the colour order since cv2 expects BGR

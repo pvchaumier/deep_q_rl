@@ -28,8 +28,8 @@ def main(args):
                         help='Number of steps per epoch (default: %(default)s)')
     parser.add_argument('-t', '--test-length', dest="test_steps", type=int, default=DefaultStepsPerTest,
                         help='Number of steps per test (default: %(default)s)')    
-    parser.add_argument('--no-merge', dest="merge_frames", default=True, action="store_false",
-                        help='Tell ale not to send the averaged frames')    
+    parser.add_argument('--merge', dest="merge_frames", default=False, action="store_true",
+                        help='Tell ALE to send the averaged frames')    
     parser.add_argument('--experiment-prefix', dest="experiment_prefix", default=None,
         help='Experiment name prefix (default is the name of the game)')    
     parser.add_argument('--frame-skip', dest="frame_skip", default=DefaultFrameSkip, type=int,
@@ -54,7 +54,7 @@ def main(args):
 
     # Start the necessary processes:
     p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
-    command = ['ale', '-game_controller', 'rlglue', '-restricted_action_set', 'true','-frame_skip', str(parameters.frame_skip)]
+    command = ['ale', '-game_controller', 'rlglue', '-send_rgb', 'true','-restricted_action_set', 'true', '-frame_skip', str(parameters.frame_skip)]
     if not parameters.merge_frames:
         command.extend(['-disable_color_averaging', 'true'])
     command.append(full_rom_path)
