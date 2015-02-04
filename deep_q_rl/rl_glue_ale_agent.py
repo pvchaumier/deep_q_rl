@@ -69,8 +69,10 @@ CROP_OFFSET = 8
 class NeuralAgent(Agent):
     randGenerator=random.Random()
 
-    DefaultLearningRate = 0.0001
-    DefaultDiscountRate = 0.9
+    DefaultLearningRate = 0.0002
+    DefaultDiscountRate = 0.95
+    DefaultMomentum = 0.0
+    DefaultRMSDecay = 0.99
     DefaultEpsilonStart = 1.0
     DefaultEpsilonMin = 0.1
     DefaultEpsilonDecay = 1000000
@@ -84,6 +86,8 @@ class NeuralAgent(Agent):
         learning_rate=DefaultLearningRate,
         batch_size=DefaultBatchSize,
         discount_rate=DefaultDiscountRate,
+        momentum=DefaultMomentum,
+        rms_decay=DefaultRMSDecay,
         experiment_prefix='',
         nn_file=None,
         pause=DefaultPauseTime,
@@ -97,6 +101,8 @@ class NeuralAgent(Agent):
 
         self.game_name = game_name
         self.learning_rate=learning_rate
+        self.momentum = momentum
+        self.rms_decay = rms_decay
         self.batch_size=batch_size
         self.discount=discount_rate
         self.experiment_prefix=experiment_prefix
@@ -616,7 +622,11 @@ def main(args):
         default=NeuralAgent.DefaultLearningRate,
         help='Learning rate (default: %(default)s)')
     parser.add_argument("-d", '--discount', dest="discount_rate", type=float, default=NeuralAgent.DefaultDiscountRate,
-                        help='Discount rate (default: %(default)s)')
+        help='Discount rate (default: %(default)s)')
+    parser.add_argument("-m", '--momentum', dest="momentum", type=float, default=NeuralAgent.DefaultMomentum,
+        help='Momentum term for Nesterov momentum (default: %(default)s)')    
+    parser.add_argument('-r', '--rms_decay', dest="rms_decay", type=float, default=NeuralAgent.DefaultRMSDecay, 
+        help='Decay rate for rms_prop (default: %(default)s)')    
     parser.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=NeuralAgent.DefaultBatchSize,
         help='Batch size (default: %(default)s)')
     parser.add_argument('-e', '--experiment-prefix', dest="experiment_prefix", type=str, default="",
