@@ -18,5 +18,7 @@ PlayingArea = defaultdict(lambda: 'bottom',
     'pong' : -16,
     'space_invaders' : -14,
     'seaquest' : -20,
+    'enduro' : 20,
+    'qbert' : -20
 
     })
