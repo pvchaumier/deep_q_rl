@@ -373,7 +373,7 @@ class NeuralAgent(Agent):
 
         current_image, raw_image = self.preprocess_observation(observation.intArray)
 
-        # if 100 <= self.step_counter <= 108:
+        # if self.step_counter % 100 == 0:
         #     plt.imshow(current_image)
         #     plt.colorbar()
         #     plt.show()
