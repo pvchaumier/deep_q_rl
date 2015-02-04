@@ -60,6 +60,11 @@ assert IMAGE_HEIGHT > IMAGE_WIDTH
 
 CROPPED_SIZE = 84
 
+# Number of rows to crop off the bottom of the (downsampled) screen.
+# This is appropriate for breakout, but it may need to be modified
+# for other games. 
+CROP_OFFSET = 8
+
 
 class NeuralAgent(Agent):
     randGenerator=random.Random()
@@ -251,6 +256,8 @@ class NeuralAgent(Agent):
                                          CROPPED_SIZE,
                                          discount=self.discount,
                                          learning_rate=self.learning_rate,
+                                         decay=self.rms_decay,
+                                         momentum=self.momentum,
                                          batch_size=self.batch_size,
                                          approximator='cuda_conv')
 
@@ -323,7 +330,6 @@ class NeuralAgent(Agent):
         return return_action
 
 
-
     def _preprocess_observation_cropped_by_cv(self, observation):
         # reshape linear to original image size
         image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
@@ -341,7 +347,6 @@ class NeuralAgent(Agent):
         cropped = resized[self._crop_y:self._crop_y + CROPPED_SIZE, :]
 
         return cropped, image
-
 
 
     def _preprocess_observation_resized_by_cv(self, observation):
