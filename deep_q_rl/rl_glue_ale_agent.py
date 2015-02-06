@@ -96,7 +96,10 @@ class NeuralAgent(Agent):
         epsilon_decay=DefaultEpsilonDecay,
         testing_epsilon=DefaultTestingEpsilon,
         history_length=DefaultHistoryLength,
-        max_history=DefaultHistoryMax):
+        max_history=DefaultHistoryMax,
+        best_video=True,
+        keep_epoch_network=True,
+        learning_log=True):
 
 
         self.game_name = game_name
@@ -114,33 +117,37 @@ class NeuralAgent(Agent):
         self.phi_length=history_length
         self.max_history=max_history
         self.testing_epsilon = testing_epsilon
+        self.best_video = best_video
+        self.keep_epoch_network = keep_epoch_network
+        self.learning_log = learning_log
 
 
         # We are going with a CV crop
         self.preprocess_observation = self._preprocess_observation_cropped_by_cv
         self.save_image = self._save_array
 
-        # CREATE A FOLDER TO HOLD RESULTS
-        time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
-        prefices = []
-        if self.experiment_prefix:
-            prefices.append(experiment_prefix)
-        if self.game_name:
-            prefices.append(self.game_name)
+        if self.best_video or self.learning_log or self.keep_epoch_network:
+            # CREATE A FOLDER TO HOLD RESULTS
+            time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+            prefices = []
+            if self.experiment_prefix:
+                prefices.append(experiment_prefix)
+            if self.game_name:
+                prefices.append(self.game_name)
 
-        if prefices:
-            experiment_prefix = "%s_" % "_".join(prefices)
-        else:
-            experiment_prefix = ''
+            if prefices:
+                experiment_prefix = "%s_" % "_".join(prefices)
+            else:
+                experiment_prefix = ''
 
-        self.experiment_directory = "%s%s_%s_%s" % (experiment_prefix, time_str, str(self.learning_rate).replace(".", "p"), str(self.discount).replace(".", "p"))
+            self.experiment_directory = "%s%s_%s_%s" % (experiment_prefix, time_str, str(self.learning_rate).replace(".", "p"), str(self.discount).replace(".", "p"))
 
-        logging.info("Experiment directory: %s" % self.experiment_directory)
+            logging.debug("Experiment directory: %s" % self.experiment_directory)
 
-        try:
-            os.stat(self.experiment_directory)
-        except (IOError, OSError):
-            os.makedirs(self.experiment_directory)
+            try:
+                os.stat(self.experiment_directory)
+            except (IOError, OSError):
+                os.makedirs(self.experiment_directory)
 
         self.learning_file = self.results_file = None
 
@@ -154,7 +161,7 @@ class NeuralAgent(Agent):
                                       TaskSpecVRLGLUE3.TaskSpecParser
         """
         # DO SOME SANITY CHECKING ON THE TASKSPEC
-        logging.info("Task spec: %s" % task_spec_string)
+        logging.debug("Task spec: %s" % task_spec_string)
         TaskSpec = TaskSpecVRLGLUE3.TaskSpecParser(task_spec_string)
         if TaskSpec.valid:
 
@@ -219,7 +226,7 @@ class NeuralAgent(Agent):
         self.best_run_images = []
 
         self._crop_y = self.calculate_y_crop_offset()
-        logging.info("Cropping at %s" % self._crop_y)
+        logging.debug("Cropping at %s" % self._crop_y)
 
 
     def calculate_y_crop_offset(self):
@@ -270,30 +277,34 @@ class NeuralAgent(Agent):
 
 
     def _open_results_file(self):
-        results_filename = os.path.join(self.experiment_directory, 'results.csv')
-        logging.info("OPENING %s" % results_filename)
-        self.results_file = open(results_filename, 'w')
-        self.results_file.write(\
-            'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q,mean_q_considered\n')
+        if self.learning_log:
+            results_filename = os.path.join(self.experiment_directory, 'results.csv')
+            logging.info("OPENING %s" % results_filename)
+            self.results_file = open(results_filename, 'w')
+            self.results_file.write(\
+                'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q,mean_q_considered\n')
 
     def _open_learning_file(self):
-        learning_filename = os.path.join(self.experiment_directory, 'learning.csv')
-        self.learning_file = open(learning_filename, 'w')
-        self.learning_file.write('mean_loss,epsilon\n')
+        if self.learning_log:
+            learning_filename = os.path.join(self.experiment_directory, 'learning.csv')
+            self.learning_file = open(learning_filename, 'w')
+            self.learning_file.write('mean_loss,epsilon\n')
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
-        out = "{},{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
-                                  self.total_reward / max(1.0, float(num_episodes)), self.best_epoch_reward,
-                                  holdout_sum, self.epoch_considered_q / max(1, self.epoch_considered_steps))
-        self.results_file.write(out)
-        self.results_file.flush()
+        if self.learning_log:
+            out = "{},{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
+                                      self.total_reward / max(1.0, float(num_episodes)), self.best_epoch_reward,
+                                      holdout_sum, self.epoch_considered_q / max(1, self.epoch_considered_steps))
+            self.results_file.write(out)
+            self.results_file.flush()
 
 
     def _update_learning_file(self):
-        out = "{},{}\n".format(np.mean(self.loss_averages),
-                               self.epsilon)
-        self.learning_file.write(out)
-        self.learning_file.flush()
+        if self.learning_log:
+            out = "{},{}\n".format(np.mean(self.loss_averages),
+                                   self.epsilon)
+            self.learning_file.write(out)
+            self.learning_file.flush()
 
 
     def agent_start(self, observation):
@@ -364,6 +375,14 @@ class NeuralAgent(Agent):
         interpolation=cv2.INTER_LINEAR)
         uinted = np.array(resized, dtype='uint8')
         return uinted, image
+
+
+    def _record_network(self, epoch):
+        if self.keep_epoch_network:
+            network_filename = os.path.join(self.experiment_directory, 'network_file_%s.pkl' % epoch)
+            net_file = open(network_filename, 'w')
+            cPickle.dump(self.network, net_file, -1)
+            net_file.close()
 
 
     def agent_step(self, reward, observation):
@@ -498,6 +517,24 @@ class NeuralAgent(Agent):
                                      True)
 
 
+    def calculate_q_for_standard_set(self):
+        """
+        Calculate Q-values for a set that we'll keep reusing to track progress of Q-values
+        """
+
+        holdout_size = 3200
+
+        if self.holdout_data is None:
+            self.holdout_data = self.data_set.random_batch(holdout_size)[0]
+
+        holdout_sum = 0
+        for i in range(holdout_size):
+            holdout_sum += np.max(
+                self.network.q_vals(self.holdout_data[i, ...]))
+
+        return holdout_sum / holdout_size
+
+
     def agent_cleanup(self):
         """
         Called once at the end of an experiment.  We could save results
@@ -518,11 +555,7 @@ class NeuralAgent(Agent):
 
     def _finish_epoch(self, epoch):
         self.agent_end(0, epoch_end=True)
-
-        network_filename = os.path.join(self.experiment_directory, 'network_file_%s.pkl' % epoch)
-        net_file = open(network_filename, 'w')
-        cPickle.dump(self.network, net_file, -1)
-        net_file.close()
+        self._record_network(epoch)
 
     def _start_testing(self):
         self.testing = True
@@ -535,20 +568,9 @@ class NeuralAgent(Agent):
 
     def _finish_testing(self, epoch):
         self.agent_end(0, epoch_end=True)
-
         self.testing = False
-        holdout_size = 3200
-
-        if self.holdout_data is None:
-            self.holdout_data = self.data_set.random_batch(holdout_size)[0]
-
-        holdout_sum = 0
-        for i in range(holdout_size):
-            holdout_sum += np.max(
-                self.network.q_vals(self.holdout_data[i, ...]))
-
-        self._update_results_file(epoch, self.episode_counter,
-                                  holdout_sum / holdout_size)
+        average_q = self.calculate_q_for_standard_set()
+        self._update_results_file(epoch, self.episode_counter, average_q)
         self.record_best_run(epoch)
 
 
@@ -558,7 +580,7 @@ class NeuralAgent(Agent):
         to save data to the indicated file.
         """
 
-        logging.info("Received %s" % in_message)
+        logging.debug("Received %s" % in_message)
 
         if in_message.startswith("start_epoch"):
             epoch = int(in_message.split(" ")[1])
@@ -579,12 +601,13 @@ class NeuralAgent(Agent):
 
 
     def record_best_run(self, epoch):
-        recording_directory = os.path.join(self.experiment_directory, "bestof%03d_%s" % (epoch, self.best_epoch_reward))
-        os.mkdir(recording_directory)
+        if self.best_video:
+            recording_directory = os.path.join(self.experiment_directory, "bestof%03d_%s" % (epoch, self.best_epoch_reward))
+            os.mkdir(recording_directory)
 
-        for index, image in enumerate(self.best_run_images):
-            full_name = os.path.join(recording_directory, "frame%06d.png" % index)
-            self.save_image(image, full_name)
+            for index, image in enumerate(self.best_run_images):
+                full_name = os.path.join(recording_directory, "frame%06d.png" % index)
+                self.save_image(image, full_name)
 
 
     def _save_array(self, image, filename):
@@ -646,11 +669,22 @@ def main(args):
         help='History length (default: %(default)s)')
     parser.add_argument('--max-history', dest="max_history", type=int, default=NeuralAgent.DefaultHistoryMax,
         help='Maximum number of steps stored (default: %(default)s)')
+    parser.add_argument('--no-video', dest="video", default=True, action="store_false",
+        help='Do not make a "video" record of the best run in each game')    
+    parser.add_argument('--no-records', dest="recording", default=True, action="store_false",
+        help='Do not record anything about the experiment (best games, epoch networks, test results, etc)')
+
 
     # ignore unknowns
     parameters, _ = parser.parse_known_args(args)
 
     setupLogging(parameters.verbosity)
+
+    if not parameters.recording:
+        best_video = epoch_network = learning_log = False
+    else:
+        best_video = parameters.video
+        epoch_network = learning_log = True
 
     AgentLoader.loadAgent(NeuralAgent(parameters.game_name,
         learning_rate=parameters.learning_rate,
@@ -663,7 +697,10 @@ def main(args):
         epsilon_min=parameters.epsilon_min,
         epsilon_decay=parameters.epsilon_decay,
         history_length=parameters.history_length,
-        max_history=parameters.max_history))
+        max_history=parameters.max_history,
+        best_video=best_video,
+        keep_epoch_network=epoch_network,
+        learning_log=learning_log))
 
 
 if __name__ == "__main__":
