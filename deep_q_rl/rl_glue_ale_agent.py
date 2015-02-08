@@ -659,6 +659,8 @@ def main(args):
         help='Minimum epsilon. (default: %(default)s)')
     parser.add_argument('--epsilon-decay', dest="epsilon_decay", type=float, default=NeuralAgent.DefaultEpsilonDecay,
         help='Number of steps to minimum epsilon. (default: %(default)s)')
+    parser.add_argument('-t', '--testing-epsilon', dest="testing_epsilon", type=float, default=NeuralAgent.DefaultTestingEpsilon,
+        help='Epsilon to use during testing (default: %(default)s)')        
     parser.add_argument("-hl", '--history-length', dest="history_length", type=int, default=NeuralAgent.DefaultHistoryLength,
         help='History length (default: %(default)s)')
     parser.add_argument('--max-history', dest="max_history", type=int, default=NeuralAgent.DefaultHistoryMax,
@@ -684,12 +686,15 @@ def main(args):
         learning_rate=parameters.learning_rate,
         batch_size=parameters.batch_size,
         discount_rate=parameters.discount_rate,
+        momentum=parameters.momentum,
+        rms_decay=parameters.rms_decay,
         experiment_prefix=parameters.experiment_prefix,
         nn_file=parameters.nn_file,
         pause=parameters.pause,
         epsilon_start=parameters.epsilon_start,
         epsilon_min=parameters.epsilon_min,
         epsilon_decay=parameters.epsilon_decay,
+        testing_epsilon=parameters.testing_epsilon,        
         history_length=parameters.history_length,
         max_history=parameters.max_history,
         best_video=best_video,
