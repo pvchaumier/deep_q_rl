@@ -60,12 +60,6 @@ assert IMAGE_HEIGHT > IMAGE_WIDTH
 
 CROPPED_SIZE = 84
 
-# Number of rows to crop off the bottom of the (downsampled) screen.
-# This is appropriate for breakout, but it may need to be modified
-# for other games. 
-CROP_OFFSET = 8
-
-
 class NeuralAgent(Agent):
     randGenerator=random.Random()
 
