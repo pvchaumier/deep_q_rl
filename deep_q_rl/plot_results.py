@@ -36,7 +36,7 @@ def plot(filename, plot_q_values, game_name):
         qvalues.set_xlabel('epoch')
         qvalues.set_ylabel('Q value')
 
-    else:
+    elif game_name:
         scores.set_title(game_name)
 
 
