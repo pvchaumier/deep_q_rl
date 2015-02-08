@@ -9,7 +9,7 @@ import sys
 import os
 import argparse
 
-DefaultBaseROMPath = "/usr/src/machinelearning/Arcade-Learning-Environment/roms/"
+DefaultBaseROMPath = "../roms/"
 DefaultROM = 'breakout.bin'
 DefaultPort = 4096
 DefaultStepsPerEpoch = 50000
