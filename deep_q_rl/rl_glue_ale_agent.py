@@ -57,7 +57,6 @@ IMAGE_WIDTH = 160
 IMAGE_HEIGHT = 210
 
 assert IMAGE_HEIGHT > IMAGE_WIDTH
-
 CROPPED_SIZE = 84
 
 class NeuralAgent(Agent):
@@ -335,8 +334,7 @@ class NeuralAgent(Agent):
             if raw_image is not None:
                 self.episode_images = [raw_image]
             else:
-                self.episod_images = []
-
+                self.episode_images = []
 
         return return_action
 
@@ -358,7 +356,6 @@ class NeuralAgent(Agent):
         cropped = resized[self._crop_y:self._crop_y + CROPPED_SIZE, :]
 
         return cropped, image
-
 
     def _preprocess_observation_resized_by_cv(self, observation):
         image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)

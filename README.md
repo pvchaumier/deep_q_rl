@@ -30,7 +30,7 @@ Here is a video showing a trained network playing breakout:
   * [Theano](http://deeplearning.net/software/theano/) ([https://github.com/Theano/Theano](https://github.com/Theano/Theano))
   * [Pylearn2](http://deeplearning.net/software/pylearn2/) ([https://github.com/lisa-lab/pylearn2](https://github.com/lisa-lab/pylearn2))
   * [Arcade Learning Environment](http://www.arcadelearningenvironment.org/) ([https://github.com/mgbellemare/Arcade-Learning-Environment](https://github.com/mgbellemare/Arcade-Learning-Environment))
-
+     * Make sure that you set the `USE_RLGLUE` flag to 1 in the makefile.
 * [RL-Glue](http://glue.rl-community.org/wiki/Main_Page)
 * [RL-Glue Python Codec](http://glue.rl-community.org/wiki/Python_Codec)
 

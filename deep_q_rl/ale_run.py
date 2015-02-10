@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 """This script launches all of the processes necessary to train a
 deep Q-network on an ALE game.
 
@@ -8,6 +9,7 @@ import subprocess
 import sys
 import os
 import argparse
+
 
 DefaultBaseROMPath = "../roms/"
 DefaultROM = 'breakout.bin'
@@ -34,8 +36,12 @@ def main(args):
         help='Experiment name prefix (default is the name of the game)')    
     parser.add_argument('--frame-skip', dest="frame_skip", default=DefaultFrameSkip, type=int,
                         help='Every how many frames to process (default: %(default)s)')        
+    parser.add_argument('--display-screen', dest="display_screen", 
+                        action='store_true', default=False,
+                        help='Show the game screen.')
     parser.add_argument('--glue-port', dest="glue_port", type=int, default=DefaultPort,
                         help='rlglue port (default: %(default)s)')
+
     parameters, unknown = parser.parse_known_args(args)
 
     my_env = os.environ.copy()
@@ -57,6 +63,8 @@ def main(args):
     command = ['ale', '-game_controller', 'rlglue', '-send_rgb', 'true','-restricted_action_set', 'true', '-frame_skip', str(parameters.frame_skip)]
     if not parameters.merge_frames:
         command.extend(['-disable_color_averaging', 'true'])
+    if parameters.display_screen:
+        command.extend(['-display_screen', 'true'])        
     command.append(full_rom_path)
     p2 = subprocess.Popen(command, env=my_env, close_fds=close_fds)
     p3 = subprocess.Popen(['./rl_glue_ale_experiment.py', '-vv', '--steps-per-epoch', str(parameters.steps_per_epoch), 
