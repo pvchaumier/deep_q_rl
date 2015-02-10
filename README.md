@@ -39,19 +39,19 @@ Here is a video showing a trained network playing breakout:
 
 Use the script `ale_run.py` to start all the necessary processes:
 
-`$ python ale_run.py --exp_pref data`
+`$ python ale_run.py --experiment-prefix data`
 
 This will store output files in a folder prefixed with `data` in the current
 directory.  Pickled version of the network objects are stored after every 
 epoch.  The file `results.csv` will contain the testing output.  You can 
 plot the progress by executing `plot_results.py`:
 
-`$ python plot_results.py data_09-29-15-46_0p0001_0p9/results.csv`
+`$ python plot_results.py data_breakout_09-29-15-46_0p0001_0p9/results.csv`
 
 After a couple of days, you can watch the trained network play using the 
 `ale_run_watch.py` script: 
 
-`$ python ale_run_watch.py data_09-29-15-46_0p0001_0p9/network_file_99.pkl`
+`$ python ale_run_watch.py data_breakout_09-29-15-46_0p0001_0p9/network_file_99.pkl`
 
 # Getting Help
 
