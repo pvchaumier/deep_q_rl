@@ -479,7 +479,6 @@ class NeuralAgent(Agent):
             # Corner case where we get an end due to end of epoch just after a game ended
             return
 
-        self.episode_counter += 1
         self.step_counter += 1
         total_time = time.time() - self.start_time
 
@@ -492,7 +491,11 @@ class NeuralAgent(Agent):
                 if self.best_score_ever is None or self.episode_reward > self.best_score_ever:
                     self.best_score_ever = self.episode_reward
 
-            self.total_reward += self.episode_reward
+            if not epoch_end or self.episode_counter == 0:
+                # only collect stats for this episode if it didn't get truncated, or if it's the 
+                # only one we are going to get for this testing epoch                
+                self.episode_counter += 1
+                self.total_reward += self.episode_reward
         else:
             logging.info("Simulated at a rate of {} frames/s ({} batches/s) \n Average loss: {}".format(\
                 self.step_counter / total_time,
