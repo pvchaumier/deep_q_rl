@@ -656,7 +656,7 @@ def main(args):
         help='Minimum epsilon. (default: %(default)s)')
     parser.add_argument('--epsilon-decay', dest="epsilon_decay", type=float, default=NeuralAgent.DefaultEpsilonDecay,
         help='Number of steps to minimum epsilon. (default: %(default)s)')
-    parser.add_argument('-t', '--testing-epsilon', dest="testing_epsilon", type=float, default=NeuralAgent.DefaultTestingEpsilon,
+    parser.add_argument('-t', '--test-epsilon', dest="testing_epsilon", type=float, default=NeuralAgent.DefaultTestingEpsilon,
         help='Epsilon to use during testing (default: %(default)s)')        
     parser.add_argument("-hl", '--history-length', dest="history_length", type=int, default=NeuralAgent.DefaultHistoryLength,
         help='History length (default: %(default)s)')
