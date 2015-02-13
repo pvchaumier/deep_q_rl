@@ -342,13 +342,12 @@ class TestingNeuralAgent(Agent):
         return int_action, max_q
 
 
-    def agent_end(self, reward):
+    def agent_end(self, reward, testing_stop=False):
         """
         This function is called once at the end of an episode.
 
         Arguments:
            reward      - Real valued reward.
-
         Returns:
             None
         """
@@ -357,12 +356,12 @@ class TestingNeuralAgent(Agent):
             # Corner case where we get an end due to end of epoch just after a game ended
             return
 
-        self.episode_counter += 1
         self.step_counter += 1
         total_time = time.time() - self.start_time
-
+        logging.info("FPS in that episode: %s" % total_time / float(self.step_counter))
 
         self.episode_reward += reward
+            
         if self.best_epoch_reward is None or self.episode_reward > self.best_epoch_reward:
             self.best_epoch_reward = self.episode_reward
             self.best_run_images = self.episode_images
@@ -370,7 +369,11 @@ class TestingNeuralAgent(Agent):
             if self.best_score_ever is None or self.episode_reward > self.best_score_ever:
                 self.best_score_ever = self.episode_reward
 
-        self.total_reward += self.episode_reward
+        if not testing_stop or self.episode_counter == 0:
+            # only collect stats for this episode if it didn't get truncated, or if it's the 
+            # only one we are going to get for this testing epoch
+            self.episode_counter += 1
+            self.total_reward += self.episode_reward
 
 
     def agent_cleanup(self):
@@ -401,7 +404,7 @@ class TestingNeuralAgent(Agent):
 
 
     def _finish_testing(self, epoch):
-        self.agent_end(0)
+        self.agent_end(0, True)
         self._update_results_file(epoch, self.episode_counter)
         self.record_best_run(epoch)
 
@@ -459,7 +462,7 @@ def main(args):
         help='Batch size (default: %(default)s)')
     parser.add_argument('-e', '--experiment-directory', dest="experiment_directory", type=str, required=True,
         help='Directory where experiment details were saved')
-    parser.add_argument('-t', '--testing-epsilon', dest="testing_epsilon", type=float, default=TestingNeuralAgent.DefaultTestingEpsilon,
+    parser.add_argument('-t', '--test-epsilon', dest="testing_epsilon", type=float, default=TestingNeuralAgent.DefaultTestingEpsilon,
         help='Epsilon to use during testing (default: %(default)s)')    
     parser.add_argument("-p", '--pause', dest="pause", type=float, default=TestingNeuralAgent.DefaultPauseTime,
         help='Amount of time to pause display while testing. (default: %(default)s)')
