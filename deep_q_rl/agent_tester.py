@@ -358,7 +358,7 @@ class TestingNeuralAgent(Agent):
 
         self.step_counter += 1
         total_time = time.time() - self.start_time
-        logging.info("FPS in that episode: %s" % total_time / float(self.step_counter))
+        logging.info("FPS in that episode: %s" % (float(self.step_counter)/ total_time))
 
         self.episode_reward += reward
             
