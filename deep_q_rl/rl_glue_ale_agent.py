@@ -528,10 +528,9 @@ class NeuralAgent(Agent):
         if self.holdout_data is None:
             if len(self.data_set) >= holdout_size:
                 self.holdout_data = self.data_set.random_batch(holdout_size)[0]
-
-        if not self.holdout_data:
-            # one of those cases where we didn't train, just testing
-            return 0
+            else:
+                # one of those cases where we didn't train, we are just testing
+                return 0
 
         holdout_sum = 0
         for i in range(holdout_size):

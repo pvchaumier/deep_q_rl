@@ -21,11 +21,10 @@ DefaultEpochs = 300
 DefaultStepsPerTest = 10000
 DefaultFrameSkip = 4
 
+def createParser(parser=None):
+    if parser is None:
+        parser = OtherScriptHelper(description=__doc__)    
 
-
-def main(args):
-    # Check for glue_port command line argument and set it up...
-    parser = OtherScriptHelper(description=__doc__)
     parser.add_argument('-r', '--rom', dest="rom", default=DefaultROM,
                         help='ROM to run (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int, default=DefaultEpochs,
@@ -46,8 +45,9 @@ def main(args):
 
     parser.other_parsers.append(addScriptArguments(None, in_group=True))
 
-    parameters, unknown = parser.parse_known_args(args)
+    return parser    
 
+def run(parameters, unknown):
     my_env = os.environ.copy()
     my_env["RLGLUE_PORT"] = str(parameters.glue_port)
 
@@ -81,6 +81,15 @@ def main(args):
     p3.wait()
     p4.wait()
 
+    return 0    
+
+
+def main(args):
+    parser = createParser()
+
+    parameters, unknown = parser.parse_known_args(args)
+
+    return run(parameters, unknown)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

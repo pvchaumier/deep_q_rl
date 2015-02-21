@@ -3,22 +3,32 @@ visualization turned on.
 
 Usage:
 
-ale_run_watch.py NETWORK_PKL_FILE [ ROM ]
+ale_run_watch.py [usual parameters to ale_run.py]
 """
-import subprocess
 import sys
 
-def run_watch():
-    command = ['./ale_run.py', '--glue-port', '4097', '--steps-per-epoch', '0',
-               '--test-length', '10000', '--nn_file', sys.argv[1],
-               '--pause', '.03', '--display-screen']
+from ale_run import createParser, run
 
-    if len(sys.argv) > 2:
-        command.extend(['--rom', sys.argv[2]])
+DefaultGluePort = 4097
+DefaultTestSteps = 1000000
 
-    p1 = subprocess.Popen(command)
-    
-    p1.wait()
+def run_watch(args):
+    parser = createParser()
+
+    parser.set_defaults(glue_port=DefaultGluePort, steps_per_epoch=0, display_screen=True, epochs=1, 
+        test_steps=DefaultTestSteps)
+
+    parameters, unknown = parser.parse_known_args(args)
+
+
+    if '--pause' not in unknown and '-p' not in unknown:
+        unknown.extend(['-p', '0.03'])
+
+    if '--max-history' not in unknown:
+        unknown.extend(['--max-history', '4000']) # small history to reduce useless training space
+
+    return run(parameters, unknown)
+
 
 if __name__ == "__main__":
-    run_watch()
+    sys.exit(run_watch(sys.argv[1:]))
