@@ -8,7 +8,9 @@ rl_glue_ale_agent.py
 import subprocess
 import sys
 import os
-import argparse
+
+from parsers import OtherScriptHelper
+from rl_glue_ale_agent import addScriptArguments
 
 
 DefaultBaseROMPath = "../roms/"
@@ -19,9 +21,11 @@ DefaultEpochs = 300
 DefaultStepsPerTest = 10000
 DefaultFrameSkip = 4
 
+
+
 def main(args):
     # Check for glue_port command line argument and set it up...
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = OtherScriptHelper(description=__doc__)
     parser.add_argument('-r', '--rom', dest="rom", default=DefaultROM,
                         help='ROM to run (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int, default=DefaultEpochs,
@@ -32,8 +36,6 @@ def main(args):
                         help='Number of steps per test (default: %(default)s)')    
     parser.add_argument('--merge', dest="merge_frames", default=False, action="store_true",
                         help='Tell ALE to send the averaged frames')    
-    parser.add_argument('--experiment-prefix', dest="experiment_prefix", default=None,
-        help='Experiment name prefix (default is the name of the game)')    
     parser.add_argument('--frame-skip', dest="frame_skip", default=DefaultFrameSkip, type=int,
                         help='Every how many frames to process (default: %(default)s)')        
     parser.add_argument('--display-screen', dest="display_screen", 
@@ -41,6 +43,8 @@ def main(args):
                         help='Show the game screen.')
     parser.add_argument('--glue-port', dest="glue_port", type=int, default=DefaultPort,
                         help='rlglue port (default: %(default)s)')
+
+    parser.other_parsers.append(addScriptArguments(None, in_group=True))
 
     parameters, unknown = parser.parse_known_args(args)
 
@@ -70,8 +74,6 @@ def main(args):
     p3 = subprocess.Popen(['./rl_glue_ale_experiment.py', '-vv', '--steps-per-epoch', str(parameters.steps_per_epoch), 
         '--test-length', str(parameters.test_steps), '--epochs', str(parameters.epochs)], env=my_env, close_fds=close_fds)
     command = ['./rl_glue_ale_agent.py', '-vv', '--game-name', game_name]
-    if parameters.experiment_prefix:
-        command.extend(['--experiment-prefix', parameters.experiment_prefix])
     p4 = subprocess.Popen(command + unknown, env=my_env, close_fds=close_fds)
 
     p1.wait()

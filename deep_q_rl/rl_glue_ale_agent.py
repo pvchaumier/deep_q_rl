@@ -620,6 +620,64 @@ class NeuralAgent(Agent):
         plt.show()
 
 
+
+def addScriptArguments(parser=None, in_group=False):
+    """
+    Add arguments for this script to the passed parser, or create a parser if None is passed
+    If in_group is true, add the parameters to a group
+    """
+
+    if parser is None:
+        parser = argparse.ArgumentParser(description='Neural rl agent.')
+
+    if in_group:
+        group = parser.add_argument_group('Agent', 'Parameters passed to rl_glue_agent')
+    else:
+        group = parser
+
+    group.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
+                      help="Verbosity.  Invoke many times for higher verbosity")
+    group.add_argument("-g", '--game-name', dest="game_name", default=None,
+        help='Name of the game')
+    group.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float,
+        default=NeuralAgent.DefaultLearningRate,
+        help='Learning rate (default: %(default)s)')
+    group.add_argument("-d", '--discount', dest="discount_rate", type=float, default=NeuralAgent.DefaultDiscountRate,
+        help='Discount rate (default: %(default)s)')
+    group.add_argument("-m", '--momentum', dest="momentum", type=float, default=NeuralAgent.DefaultMomentum,
+        help='Momentum term for Nesterov momentum (default: %(default)s)')    
+    group.add_argument('--rms_decay', dest="rms_decay", type=float, default=NeuralAgent.DefaultRMSDecay, 
+        help='Decay rate for rms_prop (default: %(default)s)')    
+    group.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=NeuralAgent.DefaultBatchSize,
+        help='Batch size (default: %(default)s)')
+    group.add_argument('--experiment-prefix', dest="experiment_prefix", type=str, default="",
+        help='Experiment name prefix (default: %(default)s)')
+    group.add_argument("-n", '--nn-file', dest="nn_file", type=str, default=None,
+        help='Pickle file containing trained net. (default: %(default)s)')
+    group.add_argument("-p", '--pause', dest="pause", type=float, default=NeuralAgent.DefaultPauseTime,
+        help='Amount of time to pause display while testing. (default: %(default)s)')
+    group.add_argument("-es", '--epsilon-start', dest="epsilon_start", type=float,
+        default=NeuralAgent.DefaultEpsilonStart,
+        help='Starting value for epsilon. (default: %(default)s)')
+    group.add_argument('--epsilon-min', dest="epsilon_min", type=float, default=NeuralAgent.DefaultEpsilonMin,
+        help='Minimum epsilon. (default: %(default)s)')
+    group.add_argument('--epsilon-decay', dest="epsilon_decay", type=float, default=NeuralAgent.DefaultEpsilonDecay,
+        help='Number of steps to minimum epsilon. (default: %(default)s)')
+    group.add_argument('-te', '--test-epsilon', dest="testing_epsilon", type=float, default=NeuralAgent.DefaultTestingEpsilon,
+        help='Epsilon to use during testing (default: %(default)s)')        
+    group.add_argument("-hl", '--history-length', dest="history_length", type=int, default=NeuralAgent.DefaultHistoryLength,
+        help='History length (default: %(default)s)')
+    group.add_argument('--max-history', dest="max_history", type=int, default=NeuralAgent.DefaultHistoryMax,
+        help='Maximum number of steps stored (default: %(default)s)')
+    group.add_argument('--no-video', dest="video", default=True, action="store_false",
+        help='Do not make a "video" record of the best run in each game')    
+    group.add_argument('--no-records', dest="recording", default=True, action="store_false",
+        help='Do not record anything about the experiment (best games, epoch networks, test results, etc)')
+
+    return parser        
+
+
+
 def main(args):
     """
     Mostly just read command line arguments here. We do this here
@@ -630,46 +688,7 @@ def main(args):
     from logutils import setupLogging
 
     # Handle command line argument:
-    parser = argparse.ArgumentParser(description='Neural rl agent.')
-    parser.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
-                      help="Verbosity.  Invoke many times for higher verbosity")
-    parser.add_argument("-g", '--game-name', dest="game_name", default=None,
-        help='Name of the game')
-    parser.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float,
-        default=NeuralAgent.DefaultLearningRate,
-        help='Learning rate (default: %(default)s)')
-    parser.add_argument("-d", '--discount', dest="discount_rate", type=float, default=NeuralAgent.DefaultDiscountRate,
-        help='Discount rate (default: %(default)s)')
-    parser.add_argument("-m", '--momentum', dest="momentum", type=float, default=NeuralAgent.DefaultMomentum,
-        help='Momentum term for Nesterov momentum (default: %(default)s)')    
-    parser.add_argument('-r', '--rms_decay', dest="rms_decay", type=float, default=NeuralAgent.DefaultRMSDecay, 
-        help='Decay rate for rms_prop (default: %(default)s)')    
-    parser.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=NeuralAgent.DefaultBatchSize,
-        help='Batch size (default: %(default)s)')
-    parser.add_argument('-e', '--experiment-prefix', dest="experiment_prefix", type=str, default="",
-        help='Experiment name prefix (default: %(default)s)')
-    parser.add_argument("-n", '--nn-file', dest="nn_file", type=str, default=None,
-        help='Pickle file containing trained net. (default: %(default)s)')
-    parser.add_argument("-p", '--pause', dest="pause", type=float, default=NeuralAgent.DefaultPauseTime,
-        help='Amount of time to pause display while testing. (default: %(default)s)')
-    parser.add_argument("-es", '--epsilon-start', dest="epsilon_start", type=float,
-        default=NeuralAgent.DefaultEpsilonStart,
-        help='Starting value for epsilon. (default: %(default)s)')
-    parser.add_argument('--epsilon-min', dest="epsilon_min", type=float, default=NeuralAgent.DefaultEpsilonMin,
-        help='Minimum epsilon. (default: %(default)s)')
-    parser.add_argument('--epsilon-decay', dest="epsilon_decay", type=float, default=NeuralAgent.DefaultEpsilonDecay,
-        help='Number of steps to minimum epsilon. (default: %(default)s)')
-    parser.add_argument('-t', '--test-epsilon', dest="testing_epsilon", type=float, default=NeuralAgent.DefaultTestingEpsilon,
-        help='Epsilon to use during testing (default: %(default)s)')        
-    parser.add_argument("-hl", '--history-length', dest="history_length", type=int, default=NeuralAgent.DefaultHistoryLength,
-        help='History length (default: %(default)s)')
-    parser.add_argument('--max-history', dest="max_history", type=int, default=NeuralAgent.DefaultHistoryMax,
-        help='Maximum number of steps stored (default: %(default)s)')
-    parser.add_argument('--no-video', dest="video", default=True, action="store_false",
-        help='Do not make a "video" record of the best run in each game')    
-    parser.add_argument('--no-records', dest="recording", default=True, action="store_false",
-        help='Do not record anything about the experiment (best games, epoch networks, test results, etc)')
-
+    parser = addScriptArguments()
 
     # ignore unknowns
     parameters, _ = parser.parse_known_args(args)
