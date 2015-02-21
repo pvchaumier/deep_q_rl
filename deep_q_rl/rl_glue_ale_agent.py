@@ -91,6 +91,7 @@ class NeuralAgent(Agent):
         history_length=DefaultHistoryLength,
         max_history=DefaultHistoryMax,
         best_video=True,
+        inner_video=False,
         keep_epoch_network=True,
         learning_log=True):
 
@@ -111,6 +112,7 @@ class NeuralAgent(Agent):
         self.max_history=max_history
         self.testing_epsilon = testing_epsilon
         self.best_video = best_video
+        self.inner_video = inner_video
         self.keep_epoch_network = keep_epoch_network
         self.learning_log = learning_log
 
@@ -119,7 +121,7 @@ class NeuralAgent(Agent):
         self.preprocess_observation = self._preprocess_observation_cropped_by_cv
         self.save_image = self._save_array
 
-        if self.best_video or self.learning_log or self.keep_epoch_network:
+        if self.best_video or self.inner_video or self.learning_log or self.keep_epoch_network:
             # CREATE A FOLDER TO HOLD RESULTS
             time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
             prefices = []
@@ -217,6 +219,8 @@ class NeuralAgent(Agent):
         # Images for keeping best-looking runs
         self.episode_images = []
         self.best_run_images = []
+        self.episode_inner_images = []
+        self.best_run_inner_images = []
 
         self._crop_y = self.calculate_y_crop_offset()
         logging.debug("Cropping at %s" % self._crop_y)
@@ -331,6 +335,7 @@ class NeuralAgent(Agent):
 
         self.last_image, raw_image = self.preprocess_observation(observation.intArray)
         if self.testing:
+            self.episode_inner_images = [self.last_image]
             if raw_image is not None:
                 self.episode_images = [raw_image]
             else:
@@ -402,6 +407,7 @@ class NeuralAgent(Agent):
 
         #TESTING---------------------------
         if self.testing:
+            self.episode_inner_images.append(current_image)
             if raw_image is not None:
                 self.episode_images.append(raw_image)
             self.episode_reward += reward
@@ -487,6 +493,7 @@ class NeuralAgent(Agent):
             if self.best_epoch_reward is None or self.episode_reward > self.best_epoch_reward:
                 self.best_epoch_reward = self.episode_reward
                 self.best_run_images = self.episode_images
+                self.best_run_inner_images = self.episode_inner_images
 
                 if self.best_score_ever is None or self.episode_reward > self.best_score_ever:
                     self.best_score_ever = self.episode_reward
@@ -519,7 +526,12 @@ class NeuralAgent(Agent):
         holdout_size = 3200
 
         if self.holdout_data is None:
-            self.holdout_data = self.data_set.random_batch(holdout_size)[0]
+            if len(self.data_set) >= holdout_size:
+                self.holdout_data = self.data_set.random_batch(holdout_size)[0]
+
+        if not self.holdout_data:
+            # one of those cases where we didn't train, just testing
+            return 0
 
         holdout_sum = 0
         for i in range(holdout_size):
@@ -603,10 +615,23 @@ class NeuralAgent(Agent):
                 full_name = os.path.join(recording_directory, "frame%06d.png" % index)
                 self.save_image(image, full_name)
 
+        if self.inner_video:
+            recording_directory = os.path.join(self.experiment_directory, "bestinnerof%03d_%s" % (epoch, self.best_epoch_reward))
+            os.mkdir(recording_directory)
+
+            for index, image in enumerate(self.best_run_inner_images):
+                full_name = os.path.join(recording_directory, "frame%06d.png" % index)
+                self.save_image(image, full_name)
+
+
 
     def _save_array(self, image, filename):
         # Need to swap the colour order since cv2 expects BGR
-        cv2.imwrite(filename, image[:,:,::-1])
+        if len(image.shape) == 3:
+            # colour image
+            cv2.imwrite(filename, image[:,:,::-1])
+        else:
+            cv2.imwrite(filename, image)
 
     def _show_phis(self, phi1, phi2):
         for p in range(self.phi_length):
@@ -673,6 +698,9 @@ def addScriptArguments(parser=None, in_group=False):
         help='Do not make a "video" record of the best run in each game')    
     group.add_argument('--no-records', dest="recording", default=True, action="store_false",
         help='Do not record anything about the experiment (best games, epoch networks, test results, etc)')
+    group.add_argument('--inner-video', dest="inner_video", default=False, action="store_true",
+        help='Make a "video" of what the agent sees too')    
+
 
     return parser        
 
@@ -696,9 +724,10 @@ def main(args):
     setupLogging(parameters.verbosity)
 
     if not parameters.recording:
-        best_video = epoch_network = learning_log = False
+        best_video = epoch_network = learning_log = inner_video = False
     else:
         best_video = parameters.video
+        inner_video = parameters.inner_video
         epoch_network = learning_log = True
 
     AgentLoader.loadAgent(NeuralAgent(parameters.game_name,
@@ -717,6 +746,7 @@ def main(args):
         history_length=parameters.history_length,
         max_history=parameters.max_history,
         best_video=best_video,
+        inner_video=inner_video,
         keep_epoch_network=epoch_network,
         learning_log=learning_log))
 
