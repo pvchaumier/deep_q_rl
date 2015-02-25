@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """ This script runs a pre-trained network with the game
 visualization turned on.
 

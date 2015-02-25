@@ -91,6 +91,7 @@ class NeuralAgent(Agent):
         history_length=DefaultHistoryLength,
         max_history=DefaultHistoryMax,
         best_video=True,
+        every_video=False,
         inner_video=False,
         keep_epoch_network=True,
         learning_log=True):
@@ -113,6 +114,7 @@ class NeuralAgent(Agent):
         self.testing_epsilon = testing_epsilon
         self.best_video = best_video
         self.inner_video = inner_video
+        self.every_video = every_video
         self.keep_epoch_network = keep_epoch_network
         self.learning_log = learning_log
 
@@ -204,6 +206,7 @@ class NeuralAgent(Agent):
 
         self.best_score_ever = None
         self.step_counter = 0
+        self.current_epoch = 0
         self.episode_counter = 0
         self.episode_reward = 0
         self.batch_counter = 0
@@ -503,6 +506,8 @@ class NeuralAgent(Agent):
                 # only one we are going to get for this testing epoch                
                 self.episode_counter += 1
                 self.total_reward += self.episode_reward
+
+            self.record_run()
         else:
             logging.info("Simulated at a rate of {} frames/s ({} batches/s) \n Average loss: {}".format(\
                 self.step_counter / total_time,
@@ -556,14 +561,15 @@ class NeuralAgent(Agent):
 
 
     def _start_epoch(self, epoch):
-        pass
+        self.current_epoch = epoch
 
     def _finish_epoch(self, epoch):
         self.agent_end(0, epoch_end=True)
         self._record_network(epoch)
 
-    def _start_testing(self):
+    def _start_testing(self, epoch):
         self.testing = True
+        self.current_epoch = epoch        
         self.total_reward = 0
         self.episode_counter = 0
         self.best_epoch_reward = None
@@ -596,7 +602,8 @@ class NeuralAgent(Agent):
             self._finish_epoch(epoch)
 
         elif in_message.startswith("start_testing"):
-            self._start_testing()
+            epoch = int(in_message.split(" ")[1])
+            self._start_testing(epoch)
 
         elif in_message.startswith("finish_testing"):
             epoch = int(in_message.split(" ")[1])            
@@ -605,23 +612,32 @@ class NeuralAgent(Agent):
             return "I don't know how to respond to your message"
 
 
+    def _record_images(self, images, directory):
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+
+        for index, image in enumerate(images):
+            full_name = os.path.join(directory, "frame%06d.png" % index)
+            self.save_image(image, full_name)
+
+
     def record_best_run(self, epoch):
         if self.best_video:
             recording_directory = os.path.join(self.experiment_directory, "bestof%03d_%s" % (epoch, self.best_epoch_reward))
-            os.mkdir(recording_directory)
-
-            for index, image in enumerate(self.best_run_images):
-                full_name = os.path.join(recording_directory, "frame%06d.png" % index)
-                self.save_image(image, full_name)
+            self._record_images(self.best_run_images, recording_directory)
 
         if self.inner_video:
             recording_directory = os.path.join(self.experiment_directory, "bestinnerof%03d_%s" % (epoch, self.best_epoch_reward))
-            os.mkdir(recording_directory)
+            self._record_images(self.best_run_inner_images, recording_directory)
 
-            for index, image in enumerate(self.best_run_inner_images):
-                full_name = os.path.join(recording_directory, "frame%06d.png" % index)
-                self.save_image(image, full_name)
+    def record_run(self):
+        if self.every_video:
+            recording_directory = os.path.join(self.experiment_directory, "episode_%s_%s_%s" % (self.current_epoch, self.episode_counter, self.episode_reward))
+            self._record_images(self.episode_images, recording_directory)
 
+            if self.inner_video:
+                recording_directory = os.path.join(self.experiment_directory, "innerepisode_%s_%s_%s" % (self.current_epoch, self.episode_counter, self.episode_reward))
+                self._record_images(self.episode_inner_images, recording_directory)
 
 
     def _save_array(self, image, filename):
@@ -694,7 +710,9 @@ def addScriptArguments(parser=None, in_group=False):
     group.add_argument('--max-history', dest="max_history", type=int, default=NeuralAgent.DefaultHistoryMax,
         help='Maximum number of steps stored (default: %(default)s)')
     group.add_argument('--no-video', dest="video", default=True, action="store_false",
-        help='Do not make a "video" record of the best run in each game')    
+        help='Do not make a "video" record of the best run in each testing epoch')    
+    group.add_argument('--every-video', dest="every_video", default=False, action="store_true",
+        help='Make a "video" record of every testing game played, not just the best in each testing epoch')        
     group.add_argument('--no-records', dest="recording", default=True, action="store_false",
         help='Do not record anything about the experiment (best games, epoch networks, test results, etc)')
     group.add_argument('--inner-video', dest="inner_video", default=False, action="store_true",
@@ -723,10 +741,11 @@ def main(args):
     setupLogging(parameters.verbosity)
 
     if not parameters.recording:
-        best_video = epoch_network = learning_log = inner_video = False
+        best_video = epoch_network = learning_log = inner_video = every_video = False
     else:
         best_video = parameters.video
         inner_video = parameters.inner_video
+        every_video = parameters.every_video
         epoch_network = learning_log = True
 
     AgentLoader.loadAgent(NeuralAgent(parameters.game_name,
@@ -745,6 +764,7 @@ def main(args):
         history_length=parameters.history_length,
         max_history=parameters.max_history,
         best_video=best_video,
+        every_video=every_video,
         inner_video=inner_video,
         keep_epoch_network=epoch_network,
         learning_log=learning_log))

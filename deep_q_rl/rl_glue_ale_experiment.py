@@ -63,14 +63,14 @@ def main(args):
 
     for epoch in xrange(1, parameters.epochs + 1):
         if parameters.steps_per_epoch > 0:
-            RLGlue.RL_agent_message("start_epoch " + str(epoch))
+            RLGlue.RL_agent_message("start_epoch %s" % epoch)
             run_epoch(epoch, parameters.steps_per_epoch, "training")
-            RLGlue.RL_agent_message("finish_epoch " + str(epoch))
+            RLGlue.RL_agent_message("finish_epoch %s" % epoch)
 
         if parameters.test_steps > 0:
-            RLGlue.RL_agent_message("start_testing")
+            RLGlue.RL_agent_message("start_testing %s" % epoch)
             run_epoch(epoch, parameters.test_steps, "testing")
-            RLGlue.RL_agent_message("finish_testing " + str(epoch))
+            RLGlue.RL_agent_message("finish_testing %s" % epoch)
 
 
 if __name__ == "__main__":
