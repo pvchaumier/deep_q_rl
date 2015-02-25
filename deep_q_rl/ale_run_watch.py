@@ -17,6 +17,10 @@ DefaultTestSteps = 1000000
 def run_watch(args):
     parser = createParser()
 
+    parser.add_argument('--no-display-screen', dest="display_screen", 
+                        action='store_false',
+                        help="Don't show the game screen.")
+
     parser.set_defaults(glue_port=DefaultGluePort, steps_per_epoch=0, display_screen=True, epochs=1, 
         test_steps=DefaultTestSteps)
 
