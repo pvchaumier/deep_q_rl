@@ -43,15 +43,9 @@ from rlglue.types import Action
 from rlglue.utils import TaskSpecVRLGLUE3
 
 import numpy as np
-import matplotlib.pyplot as plt
 import cv2
-import theano
 
-import cnn_q_learner
-import ale_data_set
-from playingarea import PlayingArea
 
-floatX = theano.config.floatX
 
 IMAGE_WIDTH = 160
 IMAGE_HEIGHT = 210
@@ -82,6 +76,7 @@ class NeuralAgent(Agent):
         momentum=DefaultMomentum,
         rms_decay=DefaultRMSDecay,
         experiment_prefix='',
+        experiment_directory=None,
         nn_file=None,
         pause=DefaultPauseTime,
         epsilon_start=DefaultEpsilonStart,
@@ -124,20 +119,23 @@ class NeuralAgent(Agent):
         self.save_image = self._save_array
 
         if self.best_video or self.inner_video or self.learning_log or self.keep_epoch_network:
-            # CREATE A FOLDER TO HOLD RESULTS
-            time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
-            prefices = []
-            if self.experiment_prefix:
-                prefices.append(experiment_prefix)
-            if self.game_name:
-                prefices.append(self.game_name)
 
-            if prefices:
-                experiment_prefix = "%s_" % "_".join(prefices)
-            else:
-                experiment_prefix = ''
+            if experiment_directory:
+                self.experiment_directory = experiment_directory
+            else:        
+                time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+                prefices = []
+                if self.experiment_prefix:
+                    prefices.append(experiment_prefix)
+                if self.game_name:
+                    prefices.append(self.game_name)
 
-            self.experiment_directory = "%s%s_%s_%s" % (experiment_prefix, time_str, str(self.learning_rate).replace(".", "p"), str(self.discount).replace(".", "p"))
+                if prefices:
+                    experiment_prefix = "%s_" % "_".join(prefices)
+                else:
+                    experiment_prefix = ''
+
+                self.experiment_directory = "%s%s_%s_%s" % (experiment_prefix, time_str, str(self.learning_rate).replace(".", "p"), str(self.discount).replace(".", "p"))
 
             logging.debug("Experiment directory: %s" % self.experiment_directory)
 
@@ -157,6 +155,8 @@ class NeuralAgent(Agent):
                                       is decoded using
                                       TaskSpecVRLGLUE3.TaskSpecParser
         """
+        import ale_data_set
+
         # DO SOME SANITY CHECKING ON THE TASKSPEC
         logging.debug("Task spec: %s" % task_spec_string)
         TaskSpec = TaskSpecVRLGLUE3.TaskSpecParser(task_spec_string)
@@ -233,6 +233,7 @@ class NeuralAgent(Agent):
         """
         Calculate the y-offset where we are going to crop the image in the target size
         """
+        from playingarea import PlayingArea
 
         if self.game_name:
             playing_section = PlayingArea[self.game_name]
@@ -263,6 +264,8 @@ class NeuralAgent(Agent):
         A subclass may override this if a different sort
         of network is desired.
         """
+        import cnn_q_learner
+
         return cnn_q_learner.CNNQLearner(self.num_actions,
                                          self.phi_length,
                                          CROPPED_SIZE,
@@ -366,9 +369,10 @@ class NeuralAgent(Agent):
         return cropped, image
 
     def _preprocess_observation_resized_by_cv(self, observation):
+        import theano
         image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
         # convert from int32s
-        floated = np.array(image, dtype=floatX)
+        floated = np.array(image, dtype=theano.config.floatX)
         greyscaled = cv2.cvtColor(floated, cv2.COLOR_RGB2GRAY)
         resized = cv2.resize(greyscaled, (CROPPED_SIZE, CROPPED_SIZE),
         interpolation=cv2.INTER_LINEAR)
@@ -402,6 +406,7 @@ class NeuralAgent(Agent):
 
         current_image, raw_image = self.preprocess_observation(observation.intArray)
 
+        # import matplotlib.pyplot as plt
         # if self.step_counter % 100 == 0:
         #     plt.imshow(current_image)
         #     plt.colorbar()
@@ -649,6 +654,7 @@ class NeuralAgent(Agent):
             cv2.imwrite(filename, image)
 
     def _show_phis(self, phi1, phi2):
+        import matplotlib.pyplot as plt        
         for p in range(self.phi_length):
             plt.subplot(2, self.phi_length, p+1)
             plt.imshow(phi1[p, :, :], interpolation='none', cmap="gray")
@@ -692,6 +698,8 @@ def addScriptArguments(parser=None, in_group=False):
         help='Batch size (default: %(default)s)')
     group.add_argument('--experiment-prefix', dest="experiment_prefix", type=str, default="",
         help='Experiment name prefix (default: %(default)s)')
+    group.add_argument('--experiment-directory', dest="experiment_directory", type=str, default=None,
+        help='Specify exact directory where to save output to (default: combination of prefix and game name and current date and parameters)')    
     group.add_argument("-n", '--nn-file', dest="nn_file", type=str, default=None,
         help='Pickle file containing trained net. (default: %(default)s)')
     group.add_argument("-p", '--pause', dest="pause", type=float, default=NeuralAgent.DefaultPauseTime,
@@ -755,6 +763,7 @@ def main(args):
         momentum=parameters.momentum,
         rms_decay=parameters.rms_decay,
         experiment_prefix=parameters.experiment_prefix,
+        experiment_directory=parameters.experiment_directory,
         nn_file=parameters.nn_file,
         pause=parameters.pause,
         epsilon_start=parameters.epsilon_start,
