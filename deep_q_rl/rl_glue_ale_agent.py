@@ -511,8 +511,7 @@ class NeuralAgent(Agent):
                 # only one we are going to get for this testing epoch                
                 self.episode_counter += 1
                 self.total_reward += self.episode_reward
-
-            self.record_run()
+                self.record_run()
         else:
             logging.info("Simulated at a rate of {} frames/s ({} batches/s) \n Average loss: {}".format(\
                 self.step_counter / total_time,
