@@ -38,7 +38,7 @@ def createParser(parser=None):
     parser.add_argument('--frame-skip', dest="frame_skip", default=DefaultFrameSkip, type=int,
                         help='Every how many frames to process (default: %(default)s)')        
     parser.add_argument('--display-screen', dest="display_screen", 
-                        action='store_true', default=False,
+                        action='store_true', default=True,
                         help='Show the game screen.')
     parser.add_argument('--glue-port', dest="glue_port", type=int, default=DefaultPort,
                         help='rlglue port (default: %(default)s)')

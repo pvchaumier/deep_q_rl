@@ -45,6 +45,7 @@ from rlglue.utils import TaskSpecVRLGLUE3
 import numpy as np
 import cv2
 
+from network import DeepQLearner
 
 
 IMAGE_WIDTH = 160
@@ -191,7 +192,8 @@ class NeuralAgent(Agent):
             self.epsilon_rate = (self.epsilon - self.epsilon_min) / float(self.epsilon_decay)
         else:
             self.epsilon_rate = 0
-
+            
+        self.target_reset_freq = 10000 # target network update frequency
 
         self.testing = False
 
@@ -204,9 +206,12 @@ class NeuralAgent(Agent):
         self._open_results_file()
         self._open_learning_file()
 
+
         self.best_score_ever = None
         self.step_counter = 0
         self.current_epoch = 0
+
+        self.total_steps = 0
         self.episode_counter = 0
         self.episode_reward = 0
         self.batch_counter = 0
@@ -260,6 +265,7 @@ class NeuralAgent(Agent):
 
 
     def _init_network(self):
+        return DeepQLearner(CROPPED_WIDTH, CROPPED_HEIGHT, self.num_actions, self.phi_length, self.batch_size)
         """
         A subclass may override this if a different sort
         of network is desired.
@@ -402,6 +408,7 @@ class NeuralAgent(Agent):
         """
 
         self.step_counter += 1
+        self.total_steps += 1
         return_action = Action()
 
         current_image, raw_image = self.preprocess_observation(observation.intArray)
@@ -412,6 +419,9 @@ class NeuralAgent(Agent):
         #     plt.colorbar()
         #     plt.show()
         #     time.sleep(0.4)
+
+        if self.total_steps % self.target_reset_freq == 0:
+            self.network.reset_q_hat()
 
         #TESTING---------------------------
         if self.testing:
@@ -494,6 +504,7 @@ class NeuralAgent(Agent):
             return
 
         self.step_counter += 1
+        self.total_steps += 1
         total_time = time.time() - self.start_time
 
         if self.testing:
