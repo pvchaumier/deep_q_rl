@@ -1,5 +1,6 @@
 import copy
-import joblib
+import logging
+
 import lasagne
 import numpy as np
 import theano
@@ -23,22 +24,31 @@ def rmsprop_nesterov(cost, params, lr=0.001, rho=0.9, momentum=0.7, epsilon=1e-6
     return updates
 
 class DeepQLearner:
-    def __init__(self, input_width, input_height, output_dim, num_frames, batch_size):
+    def __init__(self, input_width, input_height, output_dim, num_frames, batch_size, discount, learning_rate, decay, momentum=0, size='small', separate_evaluator=False):
         self.input_width = input_width
         self.input_height = input_height
         self.output_dim = output_dim
         self.num_frames = num_frames
         self.batch_size = batch_size
-        self.gamma = 0.99 # discount factor
-        self.rho = 0.99
-        self.lr = 0.00025 # learning rate
-        self.momentum = 0.95
-        self.freeze_targets = True
+        self.gamma = discount
+        self.rho = decay
+        self.lr = learning_rate
+        self.momentum = momentum
+        self.freeze_targets = separate_evaluator
 
-        self.l_out = self.build_network(input_width, input_height, output_dim, num_frames, batch_size)
+        if size == 'small':
+            self.l_out = self.build_small_network(input_width, input_height, output_dim, num_frames, batch_size)    
+        elif size == 'big':
+            self.l_out = self.build_network(input_width, input_height, output_dim, num_frames, batch_size)
+        else:
+            raise ValueError("You better code that %s network" % size)
+
         if self.freeze_targets:
-            self.next_l_out = self.build_network(input_width, input_height, output_dim, num_frames, batch_size)
-            self.reset_q_hat()
+            if size == 'small':
+                self.next_l_out = self.build_small_network(input_width, input_height, output_dim, num_frames, batch_size)
+            elif size == 'big':
+                self.next_l_out = self.build_network(input_width, input_height, output_dim, num_frames, batch_size)
+            self.reset_estimator()
 
         states = T.tensor4('states')
         next_states = T.tensor4('next_states')
@@ -89,7 +99,7 @@ class DeepQLearner:
                 l_in,
                 num_filters=32,
                 filter_size=(8,8),
-                strides=(4,4),
+                stride=(4,4),
                 nonlinearity=lasagne.nonlinearities.rectify,
                 W=lasagne.init.Uniform(0.01),
                 b=lasagne.init.Constant(0.1),
@@ -100,7 +110,7 @@ class DeepQLearner:
                 l_conv1,
                 num_filters=64,
                 filter_size=(4,4),
-                strides=(2,2),
+                stride=(2,2),
                 nonlinearity=lasagne.nonlinearities.rectify,
                 W=lasagne.init.Uniform(0.01),
                 b=lasagne.init.Constant(0.1),
@@ -111,7 +121,7 @@ class DeepQLearner:
                 l_conv2,
                 num_filters=64,
                 filter_size=(3,3),
-                strides=(1,1),
+                stride=(1,1),
                 nonlinearity=lasagne.nonlinearities.rectify,
                 W=lasagne.init.Uniform(0.01),
                 b=lasagne.init.Constant(0.1),
@@ -149,7 +159,7 @@ class DeepQLearner:
                 l_in,
                 num_filters=16,
                 filter_size=(8,8),
-                strides=(4,4),
+                stride=(4,4),
                 nonlinearity=lasagne.nonlinearities.rectify,
                 W=lasagne.init.Uniform(0.01),
                 b=lasagne.init.Constant(0.1),
@@ -160,7 +170,7 @@ class DeepQLearner:
                 l_conv1,
                 num_filters=32,
                 filter_size=(4,4),
-                strides=(2,2),
+                stride=(2,2),
                 nonlinearity=lasagne.nonlinearities.rectify,
                 W=lasagne.init.Uniform(0.01),
                 b=lasagne.init.Constant(0.1),
@@ -204,13 +214,15 @@ class DeepQLearner:
 
     def choose_action(self, state, epsilon):
         if np.random.rand() < epsilon:
-            return np.random.randint(0, self.output_dim)
-        q_vals = self.q_vals(state)
-        return np.argmax(q_vals)
+            return np.random.randint(0, self.output_dim), None
+        else:
+            q_vals = self.q_vals(state)
+            qmax = np.max(q_vals)
+            return np.argmax(q_vals), qmax
 
-    def reset_q_hat(self):
-        print "reset_q_hat()"
+    def reset_estimator(self):
         if self.freeze_targets:
+            logging.info("resetting estimator")
             lasagne.layers.helper.set_all_param_values(self.next_l_out, copy.copy(lasagne.layers.helper.get_all_param_values(self.l_out)))
 
 def main():
