@@ -7,18 +7,26 @@ Antonoglou, Daan Wierstra, Martin Riedmiller
 """
 
 import sys, os
+import logging
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot(filename, plot_q_values, plot_max_values, game_name):
+DefaultTrainedEpoch = 100
+
+def read_data(filename):
+    input_file = open(filename, "rb")
+    results = np.loadtxt(input_file, delimiter=",", skiprows=1)
+    input_file.close()
+
+    return results
+
+
+def plot(results, plot_q_values, plot_max_values, game_name):
     # Modify this to do some smoothing...
     kernel = np.array([1.] * 1)
     kernel = kernel / np.sum(kernel)
-
-    input_file = open(filename, "rb")
-    results = np.loadtxt(input_file, delimiter=",", skiprows=1)
 
     plot_count = 1
 
@@ -58,8 +66,6 @@ def plot(filename, plot_q_values, plot_max_values, game_name):
     if game_name and plot_count == 1:
         scores.set_title(game_name)
 
-
-    input_file.close()
     plt.show()
 
 
@@ -67,20 +73,30 @@ def plot(filename, plot_q_values, plot_max_values, game_name):
 def main(args):
 
     from argparse import ArgumentParser
+    from logutils import setupLogging
     
     parser = ArgumentParser(description=__doc__)
+    parser.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
+                      help="Verbosity.  Invoke many times for higher verbosity")    
     parser.add_argument("-g", "--game-name", dest="game_name", default=None,
         help="Name of game to put on title")
     parser.add_argument("--no-q", dest="plotQValues", default=True, action="store_false",
         help="Don't plot the Q values")    
     parser.add_argument("--no-max", dest="plotMaxValues", default=True, action="store_false",
         help="Don't plot the max values")        
+    parser.add_argument("-t", "--trained-epoch", dest="trained_epoch", default=DefaultTrainedEpoch, type=int,
+        help="Epoch at which we consider the network as trained (default: %(default)s)")            
     parser.add_argument("results", nargs=1,
         help="Results file")
 
     parameters = parser.parse_args(args)
 
-    plot(os.path.expanduser(parameters.results[0]), parameters.plotQValues, parameters.plotMaxValues, parameters.game_name)
+    setupLogging(parameters.verbosity)
+
+    results = read_data(os.path.expanduser(parameters.results[0]))
+    plot(results, parameters.plotQValues, parameters.plotMaxValues, parameters.game_name)
+
+    logging.info("Average score after %d epochs: %s" % (parameters.trained_epoch, np.mean(results[parameters.trained_epoch:, 3])))
 
     return 0
 
