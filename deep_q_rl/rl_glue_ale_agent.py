@@ -45,8 +45,6 @@ from rlglue.utils import TaskSpecVRLGLUE3
 import numpy as np
 import cv2
 
-from network import DeepQLearner
-
 
 IMAGE_WIDTH = 160
 IMAGE_HEIGHT = 210
@@ -54,46 +52,95 @@ IMAGE_HEIGHT = 210
 assert IMAGE_HEIGHT > IMAGE_WIDTH
 CROPPED_SIZE = 84
 
+
+class KnowWhereYouComeFrom(argparse.Action):
+    """
+    Store action that remembers that also stores whether the value comes from being set or 
+    from the default
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values) # standard
+        if hasattr(namespace, 'manually_set'):
+            namespace.manually_set.add(self.dest)
+        else:
+            namespace.manually_set = set([self.dest])
+
+
+class DefaultParameters(object):
+    LearningRate = 0.00025
+
+    RMSDecay = 0.99
+    EpsilonStart = 1.0
+    EpsilonMin = 0.1
+    EpsilonDecay = 1000000
+    TestingEpsilon = 0.01
+    HistoryLength = 4
+    HistoryMax = 1000000
+    BatchSize = 32
+    PauseTime = 0
+    TargetResetFrequency = 10000
+    Momentum = 0.95
+    NetworkSize = 'big'
+    DiscountRate = 0.99
+
+    @classmethod
+    def get_default(cls, parameters, variable):
+        """
+        Get the default value for the variable from the default parameters
+        unless it has been manually overridden
+        """
+
+        manually_set = getattr(parameters, 'manually_set', set())
+        if variable in manually_set:
+            return getattr(parameters, variable)
+
+        parts = variable.split('_')
+        parts = [part.capitalize() for part in parts]
+        full_name = ''.join(parts)
+        return getattr(cls, full_name, getattr(parameters, variable, None))
+
+
+class NIPSParameters(DefaultParameters):
+
+    LearningRate = 0.0002
+    Momentum = 0.0
+    NetworkSize = 'small'
+    TargetResetFrequency = 0
+    DiscountRate = 0.95
+
+
+
 class NeuralAgent(Agent):
     randGenerator=random.Random()
 
-    DefaultLearningRate = 0.0002
-    DefaultDiscountRate = 0.95
-    DefaultMomentum = 0.0
-    DefaultRMSDecay = 0.99
-    DefaultEpsilonStart = 1.0
-    DefaultEpsilonMin = 0.1
-    DefaultEpsilonDecay = 1000000
-    DefaultTestingEpsilon = 0.01
-    DefaultHistoryLength = 4
-    DefaultHistoryMax = 1000000
-    DefaultBatchSize = 32
-    DefaultPauseTime = 0
 
-    def __init__(self, game_name,
-        learning_rate=DefaultLearningRate,
-        batch_size=DefaultBatchSize,
-        discount_rate=DefaultDiscountRate,
-        momentum=DefaultMomentum,
-        rms_decay=DefaultRMSDecay,
+    def __init__(self, game_name, network_size=DefaultParameters.NetworkSize,
+        learning_rate=DefaultParameters.LearningRate,
+        batch_size=DefaultParameters.BatchSize,
+        discount_rate=DefaultParameters.DiscountRate,
+        momentum=DefaultParameters.Momentum,
+        rms_decay=DefaultParameters.RMSDecay,
         experiment_prefix='',
         experiment_directory=None,
         nn_file=None,
-        pause=DefaultPauseTime,
-        epsilon_start=DefaultEpsilonStart,
-        epsilon_min=DefaultEpsilonMin,
-        epsilon_decay=DefaultEpsilonDecay,
-        testing_epsilon=DefaultTestingEpsilon,
-        history_length=DefaultHistoryLength,
-        max_history=DefaultHistoryMax,
+        pause=DefaultParameters.PauseTime,
+        epsilon_start=DefaultParameters.EpsilonStart,
+        epsilon_min=DefaultParameters.EpsilonMin,
+        epsilon_decay=DefaultParameters.EpsilonDecay,
+        testing_epsilon=DefaultParameters.TestingEpsilon,
+        history_length=DefaultParameters.HistoryLength,
+        max_history=DefaultParameters.HistoryMax,
         best_video=True,
         every_video=False,
         inner_video=False,
         keep_epoch_network=True,
-        learning_log=True):
+        learning_log=True,
+        target_reset_frequency=DefaultParameters.TargetResetFrequency):
 
 
         self.game_name = game_name
+        self.network_size = network_size
         self.learning_rate=learning_rate
         self.momentum = momentum
         self.rms_decay = rms_decay
@@ -113,10 +160,11 @@ class NeuralAgent(Agent):
         self.every_video = every_video
         self.keep_epoch_network = keep_epoch_network
         self.learning_log = learning_log
+        self.target_reset_frequency = target_reset_frequency
 
 
-        # We are going with a CV crop
-        self.preprocess_observation = self._preprocess_observation_cropped_by_cv
+        # self.preprocess_observation = self._preprocess_observation_cropped_by_cv
+        self.preprocess_observation = self._preprocess_observation_resized_by_cv
         self.save_image = self._save_array
 
         if self.best_video or self.inner_video or self.learning_log or self.keep_epoch_network:
@@ -144,8 +192,16 @@ class NeuralAgent(Agent):
                 os.stat(self.experiment_directory)
             except (IOError, OSError):
                 os.makedirs(self.experiment_directory)
+            self.record_parameters()
 
         self.learning_file = self.results_file = None
+
+
+    def record_parameters(self):
+        parameters_filename = os.path.join(self.experiment_directory, 'parameters.txt')
+        with open(parameters_filename, 'w') as parameters_file:
+            for variable in 'game_name network_size learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length max_history testing_epsilon target_reset_frequency'.split():
+                parameters_file.write('%s: %s\n' % (variable, getattr(self, variable)))
 
 
     def agent_init(self, task_spec_string):
@@ -193,7 +249,6 @@ class NeuralAgent(Agent):
         else:
             self.epsilon_rate = 0
             
-        self.target_reset_freq = 10000 # target network update frequency
 
         self.testing = False
 
@@ -265,24 +320,24 @@ class NeuralAgent(Agent):
 
 
     def _init_network(self):
-        return DeepQLearner(CROPPED_WIDTH, CROPPED_HEIGHT, self.num_actions, self.phi_length, self.batch_size)
         """
         A subclass may override this if a different sort
         of network is desired.
         """
-        import cnn_q_learner
 
-        return cnn_q_learner.CNNQLearner(self.num_actions,
-                                         self.phi_length,
-                                         CROPPED_SIZE,
-                                         CROPPED_SIZE,
-                                         discount=self.discount,
-                                         learning_rate=self.learning_rate,
-                                         decay=self.rms_decay,
-                                         momentum=self.momentum,
-                                         batch_size=self.batch_size,
-                                         approximator='cuda_conv')
+        from network import DeepQLearner
 
+        return DeepQLearner(CROPPED_SIZE, 
+                            CROPPED_SIZE, 
+                            self.num_actions, 
+                            self.phi_length, 
+                            batch_size=self.batch_size,
+                            discount=self.discount,
+                            learning_rate=self.learning_rate,
+                            decay=self.rms_decay,
+                            momentum=self.momentum,
+                            size=self.network_size,
+                            separate_evaluator=(self.target_reset_frequency > 0))
 
 
     def _open_results_file(self):
@@ -375,15 +430,13 @@ class NeuralAgent(Agent):
         return cropped, image
 
     def _preprocess_observation_resized_by_cv(self, observation):
-        import theano
         image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
-        # convert from int32s
-        floated = np.array(image, dtype=theano.config.floatX)
-        greyscaled = cv2.cvtColor(floated, cv2.COLOR_RGB2GRAY)
+        uinted = np.array(image, dtype='uint8')
+
+        greyscaled = cv2.cvtColor(uinted, cv2.COLOR_RGB2GRAY)
         resized = cv2.resize(greyscaled, (CROPPED_SIZE, CROPPED_SIZE),
         interpolation=cv2.INTER_LINEAR)
-        uinted = np.array(resized, dtype='uint8')
-        return uinted, image
+        return resized, uinted
 
 
     def _record_network(self, epoch):
@@ -420,8 +473,8 @@ class NeuralAgent(Agent):
         #     plt.show()
         #     time.sleep(0.4)
 
-        if self.total_steps % self.target_reset_freq == 0:
-            self.network.reset_q_hat()
+        if self.total_steps % self.target_reset_frequency == 0:
+            self.network.reset_estimator()
 
         #TESTING---------------------------
         if self.testing:
@@ -693,40 +746,66 @@ def addScriptArguments(parser=None, in_group=False):
 
     group.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
                       help="Verbosity.  Invoke many times for higher verbosity")
+
+    parameters = group.add_mutually_exclusive_group(required=False)
+    parameters.add_argument('--nips', dest="nips", action="store_true", default=False,
+        help="""Set parameters like they used to work with this program when it was using
+        DeepMind's NIPS paper's architecture (small network)""")
+    parameters.add_argument('--nature', dest="nature", action="store_true", default=False,
+        help="""Set parameters similar to DeepMind's Nature paper (large network) (this is the default)""")    
+
     group.add_argument("-g", '--game-name', dest="game_name", default=None,
         help='Name of the game')
-    group.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float,
-        default=NeuralAgent.DefaultLearningRate,
+    group.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float, action=KnowWhereYouComeFrom,
+        default=DefaultParameters.LearningRate,
         help='Learning rate (default: %(default)s)')
-    group.add_argument("-d", '--discount', dest="discount_rate", type=float, default=NeuralAgent.DefaultDiscountRate,
+    group.add_argument("-d", '--discount', dest="discount_rate", type=float, default=DefaultParameters.DiscountRate,
+        action=KnowWhereYouComeFrom,
         help='Discount rate (default: %(default)s)')
-    group.add_argument("-m", '--momentum', dest="momentum", type=float, default=NeuralAgent.DefaultMomentum,
+    group.add_argument("-m", '--momentum', dest="momentum", type=float, default=DefaultParameters.Momentum,
+        action=KnowWhereYouComeFrom,
         help='Momentum term for Nesterov momentum (default: %(default)s)')    
-    group.add_argument('--rms_decay', dest="rms_decay", type=float, default=NeuralAgent.DefaultRMSDecay, 
+    group.add_argument('--rms_decay', dest="RMS_decay", type=float, default=DefaultParameters.RMSDecay, 
+        action=KnowWhereYouComeFrom,
         help='Decay rate for rms_prop (default: %(default)s)')    
-    group.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=NeuralAgent.DefaultBatchSize,
+    group.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=DefaultParameters.BatchSize,
+        action=KnowWhereYouComeFrom,
         help='Batch size (default: %(default)s)')
     group.add_argument('--experiment-prefix', dest="experiment_prefix", type=str, default="",
+        action=KnowWhereYouComeFrom,
         help='Experiment name prefix (default: %(default)s)')
     group.add_argument('--experiment-directory', dest="experiment_directory", type=str, default=None,
+        action=KnowWhereYouComeFrom,
         help='Specify exact directory where to save output to (default: combination of prefix and game name and current date and parameters)')    
     group.add_argument("-n", '--nn-file', dest="nn_file", type=str, default=None,
+        action=KnowWhereYouComeFrom,
         help='Pickle file containing trained net. (default: %(default)s)')
-    group.add_argument("-p", '--pause', dest="pause", type=float, default=NeuralAgent.DefaultPauseTime,
+    group.add_argument("-p", '--pause', dest="pause", type=float, default=DefaultParameters.PauseTime,
+        action=KnowWhereYouComeFrom,
         help='Amount of time to pause display while testing. (default: %(default)s)')
     group.add_argument("-es", '--epsilon-start', dest="epsilon_start", type=float,
-        default=NeuralAgent.DefaultEpsilonStart,
+        action=KnowWhereYouComeFrom,
+        default=DefaultParameters.EpsilonStart,
         help='Starting value for epsilon. (default: %(default)s)')
-    group.add_argument('--epsilon-min', dest="epsilon_min", type=float, default=NeuralAgent.DefaultEpsilonMin,
+    group.add_argument('--epsilon-min', dest="epsilon_min", type=float, default=DefaultParameters.EpsilonMin,
+        action=KnowWhereYouComeFrom,
         help='Minimum epsilon. (default: %(default)s)')
-    group.add_argument('--epsilon-decay', dest="epsilon_decay", type=float, default=NeuralAgent.DefaultEpsilonDecay,
+    group.add_argument('--epsilon-decay', dest="epsilon_decay", type=float, default=DefaultParameters.EpsilonDecay,
+        action=KnowWhereYouComeFrom,
         help='Number of steps to minimum epsilon. (default: %(default)s)')
-    group.add_argument('-te', '--test-epsilon', dest="testing_epsilon", type=float, default=NeuralAgent.DefaultTestingEpsilon,
+    group.add_argument('-te', '--test-epsilon', dest="testing_epsilon", type=float, default=DefaultParameters.
+        TestingEpsilon,
+        action=KnowWhereYouComeFrom,
         help='Epsilon to use during testing (default: %(default)s)')        
-    group.add_argument("-hl", '--history-length', dest="history_length", type=int, default=NeuralAgent.DefaultHistoryLength,
+    group.add_argument("-hl", '--history-length', dest="history_length", type=int, default=DefaultParameters.HistoryLength,
+        action=KnowWhereYouComeFrom,
         help='History length (default: %(default)s)')
-    group.add_argument('--max-history', dest="max_history", type=int, default=NeuralAgent.DefaultHistoryMax,
+    group.add_argument('--max-history', dest="history_max", type=int, default=DefaultParameters.HistoryMax,
+        action=KnowWhereYouComeFrom,
         help='Maximum number of steps stored (default: %(default)s)')
+    group.add_argument('-tr', '--target-reset-frequency', dest="target_reset_frequency", type=int, default=DefaultParameters.TargetResetFrequency,
+        action=KnowWhereYouComeFrom,
+        help="How often to copy the current training network parameters into the estimator of goodness network, in frames. 0 to not use different networks (default: %(default)s)")
     group.add_argument('--no-video', dest="video", default=True, action="store_false",
         help='Do not make a "video" record of the best run in each testing epoch')    
     group.add_argument('--every-video', dest="every_video", default=False, action="store_true",
@@ -766,27 +845,36 @@ def main(args):
         every_video = parameters.every_video
         epoch_network = learning_log = True
 
+    if parameters.nips:
+        default_parameters = NIPSParameters
+    else:
+        default_parameters = DefaultParameters
+        
+
+
     AgentLoader.loadAgent(NeuralAgent(parameters.game_name,
-        learning_rate=parameters.learning_rate,
-        batch_size=parameters.batch_size,
-        discount_rate=parameters.discount_rate,
-        momentum=parameters.momentum,
-        rms_decay=parameters.rms_decay,
-        experiment_prefix=parameters.experiment_prefix,
-        experiment_directory=parameters.experiment_directory,
-        nn_file=parameters.nn_file,
-        pause=parameters.pause,
-        epsilon_start=parameters.epsilon_start,
-        epsilon_min=parameters.epsilon_min,
-        epsilon_decay=parameters.epsilon_decay,
-        testing_epsilon=parameters.testing_epsilon,        
-        history_length=parameters.history_length,
-        max_history=parameters.max_history,
+        network_size=default_parameters.get_default(parameters, 'network_size'),
+        learning_rate=default_parameters.get_default(parameters, 'learning_rate'),
+        batch_size=default_parameters.get_default(parameters, 'batch_size'),
+        discount_rate=default_parameters.get_default(parameters, 'discount_rate'),
+        momentum=default_parameters.get_default(parameters, 'momentum'),
+        rms_decay=default_parameters.get_default(parameters, 'RMS_decay'),
+        experiment_prefix=default_parameters.get_default(parameters, 'experiment_prefix'),
+        experiment_directory=default_parameters.get_default(parameters, 'experiment_directory'),
+        nn_file=default_parameters.get_default(parameters, 'nn_file'),
+        pause=default_parameters.get_default(parameters, 'pause'),
+        epsilon_start=default_parameters.get_default(parameters, 'epsilon_start'),
+        epsilon_min=default_parameters.get_default(parameters, 'epsilon_min'),
+        epsilon_decay=default_parameters.get_default(parameters, 'epsilon_decay'),
+        testing_epsilon=default_parameters.get_default(parameters, 'testing_epsilon'),        
+        history_length=default_parameters.get_default(parameters, 'history_length'),
+        max_history=default_parameters.get_default(parameters, 'history_max'),
         best_video=best_video,
         every_video=every_video,
         inner_video=inner_video,
         keep_epoch_network=epoch_network,
-        learning_log=learning_log))
+        learning_log=learning_log,
+        target_reset_frequency=default_parameters.get_default(parameters, 'target_reset_frequency')))
 
 
 if __name__ == "__main__":
