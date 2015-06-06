@@ -85,6 +85,7 @@ class DefaultParameters(object):
     #NetworkSize = 'big_cudnn'
     DiscountRate = 0.99
     ReplayStartSize = 50000
+    ImagePreparation = 'resize'
 
     @classmethod
     def get_default(cls, parameters, variable):
@@ -111,6 +112,7 @@ class NIPSParameters(DefaultParameters):
     TargetResetFrequency = 0
     DiscountRate = 0.95
     ReplayStartSize = 0
+    ImagePreparation = 'crop'
 
 
 class NeuralAgent(Agent):
@@ -139,7 +141,8 @@ class NeuralAgent(Agent):
         inner_video=False,
         keep_epoch_network=True,
         learning_log=True,
-        target_reset_frequency=DefaultParameters.TargetResetFrequency):
+        target_reset_frequency=DefaultParameters.TargetResetFrequency,
+        image_preparation=DefaultParameters.ImagePreparation):
 
 
         self.game_name = game_name
@@ -165,10 +168,15 @@ class NeuralAgent(Agent):
         self.learning_log = learning_log
         self.target_reset_frequency = target_reset_frequency
         self.replay_start_size = max(replay_start_size, self.batch_size)
+        self.image_preparation = image_preparation
 
+        if image_preparation == 'crop':
+            self.preprocess_observation = self._preprocess_observation_cropped_by_cv
+        elif image_preparation == 'resize':
+            self.preprocess_observation = self._preprocess_observation_resized_by_cv
+        else:
+            raise ValueError("Dunno nothing about this image preparation type: %s" % image_preparation)
 
-        # self.preprocess_observation = self._preprocess_observation_cropped_by_cv
-        self.preprocess_observation = self._preprocess_observation_resized_by_cv
         self.save_image = self._save_array
 
         if self.best_video or self.inner_video or self.learning_log or self.keep_epoch_network:
@@ -210,7 +218,7 @@ class NeuralAgent(Agent):
             gitlog = subprocess.check_output('git log -n 1 --oneline'.split()).strip()
             parameters_file.write('Last commit: %s\n' % gitlog)
 
-            for variable in 'game_name network_size learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length max_history testing_epsilon target_reset_frequency replay_start_size'.split():
+            for variable in 'game_name network_size learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length max_history testing_epsilon target_reset_frequency replay_start_size image_preparation'.split():
                 parameters_file.write('%s: %s\n' % (variable, getattr(self, variable)))
 
 
@@ -303,8 +311,9 @@ class NeuralAgent(Agent):
         self.episode_inner_images = []
         self.best_run_inner_images = []
 
-        self._crop_y = self.calculate_y_crop_offset()
-        logging.debug("Cropping at %s" % self._crop_y)
+        if self.image_preparation == 'crop':
+            self._crop_y = self.calculate_y_crop_offset()
+            logging.debug("Cropping at %s" % self._crop_y)
 
 
     def calculate_y_crop_offset(self):
@@ -343,13 +352,13 @@ class NeuralAgent(Agent):
         of network is desired.
         """
 
-        #from q_network import DeepQLearner
-        from network import DeepQLearner
+        from q_network import DeepQLearner
+        #from network import DeepQLearner
 
-        # if self.network_size == 'big':
-        #     network_type = 'nature_cuda'
-        # else:
-        #     network_type = 'nips_dnn'
+        if self.network_size == 'big':
+             network_type = 'nature_dnn'
+        else:
+             network_type = 'nips_dnn'
 
 
         return DeepQLearner(CROPPED_SIZE, 
@@ -359,13 +368,14 @@ class NeuralAgent(Agent):
                             batch_size=self.batch_size,
                             discount=self.discount,
                             learning_rate=self.learning_rate,
-                            #rho=self.rms_decay,
-                            decay=self.rms_decay,
+                            rho=self.rms_decay,
+                            #decay=self.rms_decay,
                             momentum=self.momentum,
-                            size=self.network_size,
-                            separate_evaluator=(self.target_reset_frequency > 0)
+                            #size=self.network_size,
+                            network_type=network_type,
+                            #separate_evaluator=(self.target_reset_frequency > 0)
+                            freeze_interval=self.target_reset_frequency
                             )
-                            #freeze_interval=self.target_reset_frequency)
 
 
     def _open_results_file(self):
@@ -508,18 +518,17 @@ class NeuralAgent(Agent):
             if raw_image is not None:
                 self.episode_images.append(raw_image)
             self.episode_reward += reward
-            int_action, max_q = self.choose_action(self.test_data_set, self.testing_epsilon,
+            int_action, considered = self.choose_action(self.test_data_set, self.testing_epsilon,
                                              current_image, np.clip(reward, -1, 1))
-            if max_q is not None:
+            if considered:
                 self.epoch_considered_steps += 1
-                self.epoch_considered_q += max_q
 
             if self.pause > 0:
                 time.sleep(self.pause)
 
         #NOT TESTING---------------------------
         elif len(self.data_set) > self.replay_start_size:
-            int_action, max_q = self.choose_action(self.data_set, self.epsilon,
+            int_action, considered = self.choose_action(self.data_set, self.epsilon,
                                  current_image, np.clip(reward, -1, 1))
 
             self.epsilon = max(self.epsilon_min,
@@ -527,8 +536,6 @@ class NeuralAgent(Agent):
             loss = self.do_training()
             self.batch_counter += 1
             self.loss_averages.append(loss)
-            if self.total_steps % self.target_reset_frequency == 0:
-                self.network.reset_estimator()
         else:
             # save the data and pick one at random since we haven't hit the replay size
             self.data_set.add_sample(self.last_image, self.last_action, reward, False)
@@ -553,11 +560,12 @@ class NeuralAgent(Agent):
                             reward, False)
         if self.step_counter >= self.phi_length:
             phi = data_set.phi(current_image)
-            int_action, max_q = self.network.choose_action(phi, epsilon)
+            int_action, considered = self.network.choose_action(phi, epsilon)
         else:
             int_action = self.randGenerator.randint(0, self.num_actions - 1)
-            max_q = None
-        return int_action, max_q
+            considered = False
+        return int_action, considered
+
 
     def do_training(self):
         """
@@ -802,6 +810,10 @@ def addScriptArguments(parser=None, in_group=False):
         default=DefaultParameters.ReplayStartSize,
         action=KnowWhereYouComeFrom,
         help='How many frames are needed till we start training (default: %(default)s)')    
+    group.add_argument('--image-preparation', dest="image_preparation", choices=['crop', 'resize'],
+        default=DefaultParameters.ImagePreparation,
+        action=KnowWhereYouComeFrom,
+        help='Whether to crop prior to resizing to keep the correct aspect ratio or to straight up resize the input image (default: %(default)s)')    
     group.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=DefaultParameters.BatchSize,
         action=KnowWhereYouComeFrom,
         help='Batch size (default: %(default)s)')
@@ -909,7 +921,8 @@ def main(args):
         inner_video=inner_video,
         keep_epoch_network=epoch_network,
         learning_log=learning_log,
-        target_reset_frequency=default_parameters.get_default(parameters, 'target_reset_frequency')))
+        target_reset_frequency=default_parameters.get_default(parameters, 'target_reset_frequency'),
+        image_preparation=default_parameters.get_default(parameters, 'image_preparation')))
 
 
 if __name__ == "__main__":

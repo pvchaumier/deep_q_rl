@@ -182,10 +182,9 @@ class DeepQLearner:
 
     def choose_action(self, state, epsilon):
         if np.random.rand() < epsilon:
-            return np.random.randint(0, self.num_actions), None
+            return np.random.randint(0, self.num_actions), False
         q_vals = self.q_vals(state)
-        qmax = np.max(q_vals)
-        return np.argmax(q_vals), qmax
+        return np.argmax(q_vals), True
 
     def reset_q_hat(self):
         all_params = lasagne.layers.helper.get_all_param_values(self.l_out)
