@@ -105,8 +105,7 @@ class DeepQLearner:
         }
 
         if update_rule == 'rmsprop':
-            updates = lasagne.updates.rmsprop(loss, params, self.lr, self.rho,
-                                              .01)
+            updates = lasagne.updates.rmsprop(loss, params, self.lr, self.rho)
         elif update_rule == 'sgd':
             updates = lasagne.updates.sgd(loss, params, self.lr)
         else:
@@ -269,8 +268,8 @@ class DeepQLearner:
             filter_size=(8, 8),
             stride=(4, 4),
             nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.GlorotUniform(),
-            b=lasagne.init.Uniform(.1)
+            W=lasagne.init.GlorotUniform(gain='relu'),
+            b=lasagne.init.Constant(0.1)
         )
 
         l_conv2 = dnn.Conv2DDNNLayer(
@@ -279,8 +278,8 @@ class DeepQLearner:
             filter_size=(4, 4),
             stride=(2, 2),
             nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.GlorotUniform(),
-            b=lasagne.init.Uniform(.1)
+            W=lasagne.init.GlorotUniform(gain='relu'),
+            b=lasagne.init.Constant(0.1)
         )
 
         l_conv3 = dnn.Conv2DDNNLayer(
@@ -289,8 +288,8 @@ class DeepQLearner:
             filter_size=(3, 3),
             stride=(1, 1),
             nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.GlorotUniform(),
-            b=lasagne.init.Uniform(.1)
+            W=lasagne.init.GlorotUniform(gain='relu'),
+            b=lasagne.init.Constant(0.1)
         )
 
         l_hidden1 = lasagne.layers.DenseLayer(
@@ -298,7 +297,7 @@ class DeepQLearner:
             num_units=512,
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform(),
-            b=lasagne.init.Uniform(.1)
+            b=lasagne.init.Constant(0.1)
         )
 
         l_out = lasagne.layers.DenseLayer(
@@ -306,7 +305,7 @@ class DeepQLearner:
             num_units=output_dim,
             nonlinearity=None,
             W=lasagne.init.GlorotUniform(),
-            b=lasagne.init.Uniform(.1)
+            b=lasagne.init.Constant(0.1)
         )
 
         return l_out
