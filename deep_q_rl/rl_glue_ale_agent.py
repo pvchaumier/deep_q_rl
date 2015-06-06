@@ -615,9 +615,9 @@ class NeuralAgent(Agent):
                 self.total_reward += self.episode_reward
                 self.record_run()
         else:
-            logging.info("Simulated at a rate of {} frames/s ({} batches/s) \n Average loss: {}".format(\
+            logging.info("Simulated at a rate of {} frames/s ({} trained/s) \n Average loss: {}".format(\
                 self.step_counter / total_time,
-                self.batch_counter/total_time,
+                self.batch_counter * self.batch_size/total_time,
                 np.mean(self.loss_averages)))
 
             self._update_learning_file()
