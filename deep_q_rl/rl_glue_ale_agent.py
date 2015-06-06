@@ -70,7 +70,7 @@ class KnowWhereYouComeFrom(argparse.Action):
 class DefaultParameters(object):
     LearningRate = 0.00025
 
-    RMSDecay = 0.99
+    RmsDecay = 0.95
     EpsilonStart = 1.0
     EpsilonMin = 0.1
     EpsilonDecay = 1000000
@@ -82,7 +82,9 @@ class DefaultParameters(object):
     TargetResetFrequency = 10000
     Momentum = 0.95
     NetworkSize = 'big'
+    #NetworkSize = 'big_cudnn'
     DiscountRate = 0.99
+    ReplayStartSize = 50000
 
     @classmethod
     def get_default(cls, parameters, variable):
@@ -108,7 +110,7 @@ class NIPSParameters(DefaultParameters):
     NetworkSize = 'small'
     TargetResetFrequency = 0
     DiscountRate = 0.95
-
+    ReplayStartSize = 0
 
 
 class NeuralAgent(Agent):
@@ -120,7 +122,7 @@ class NeuralAgent(Agent):
         batch_size=DefaultParameters.BatchSize,
         discount_rate=DefaultParameters.DiscountRate,
         momentum=DefaultParameters.Momentum,
-        rms_decay=DefaultParameters.RMSDecay,
+        rms_decay=DefaultParameters.RmsDecay,
         experiment_prefix='',
         experiment_directory=None,
         nn_file=None,
@@ -131,6 +133,7 @@ class NeuralAgent(Agent):
         testing_epsilon=DefaultParameters.TestingEpsilon,
         history_length=DefaultParameters.HistoryLength,
         max_history=DefaultParameters.HistoryMax,
+        replay_start_size=DefaultParameters.ReplayStartSize,
         best_video=True,
         every_video=False,
         inner_video=False,
@@ -161,6 +164,7 @@ class NeuralAgent(Agent):
         self.keep_epoch_network = keep_epoch_network
         self.learning_log = learning_log
         self.target_reset_frequency = target_reset_frequency
+        self.replay_start_size = max(replay_start_size, self.batch_size)
 
 
         # self.preprocess_observation = self._preprocess_observation_cropped_by_cv
@@ -198,10 +202,24 @@ class NeuralAgent(Agent):
 
 
     def record_parameters(self):
+        import subprocess
+
         parameters_filename = os.path.join(self.experiment_directory, 'parameters.txt')
         with open(parameters_filename, 'w') as parameters_file:
-            for variable in 'game_name network_size learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length max_history testing_epsilon target_reset_frequency'.split():
+            # write the commit we are at
+            gitlog = subprocess.check_output('git log -n 1 --oneline'.split()).strip()
+            parameters_file.write('Last commit: %s\n' % gitlog)
+
+            for variable in 'game_name network_size learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length max_history testing_epsilon target_reset_frequency replay_start_size'.split():
                 parameters_file.write('%s: %s\n' % (variable, getattr(self, variable)))
+
+
+        gitdiff = subprocess.check_output('git diff'.split()).strip()
+        if gitdiff:
+            diff_filename = os.path.join(self.experiment_directory, 'difftogit.txt')
+            with open(diff_filename, 'w') as diff_file:
+                diff_file.write(gitdiff)
+                diff_file.write('\n')
 
 
     def agent_init(self, task_spec_string):
@@ -325,7 +343,14 @@ class NeuralAgent(Agent):
         of network is desired.
         """
 
+        #from q_network import DeepQLearner
         from network import DeepQLearner
+
+        # if self.network_size == 'big':
+        #     network_type = 'nature_cuda'
+        # else:
+        #     network_type = 'nips_dnn'
+
 
         return DeepQLearner(CROPPED_SIZE, 
                             CROPPED_SIZE, 
@@ -334,10 +359,13 @@ class NeuralAgent(Agent):
                             batch_size=self.batch_size,
                             discount=self.discount,
                             learning_rate=self.learning_rate,
+                            #rho=self.rms_decay,
                             decay=self.rms_decay,
                             momentum=self.momentum,
                             size=self.network_size,
-                            separate_evaluator=(self.target_reset_frequency > 0))
+                            separate_evaluator=(self.target_reset_frequency > 0)
+                            )
+                            #freeze_interval=self.target_reset_frequency)
 
 
     def _open_results_file(self):
@@ -473,8 +501,6 @@ class NeuralAgent(Agent):
         #     plt.show()
         #     time.sleep(0.4)
 
-        if self.total_steps % self.target_reset_frequency == 0:
-            self.network.reset_estimator()
 
         #TESTING---------------------------
         if self.testing:
@@ -492,17 +518,21 @@ class NeuralAgent(Agent):
                 time.sleep(self.pause)
 
         #NOT TESTING---------------------------
-        else:
-            self.epsilon = max(self.epsilon_min,
-                               self.epsilon - self.epsilon_rate)
-
+        elif len(self.data_set) > self.replay_start_size:
             int_action, max_q = self.choose_action(self.data_set, self.epsilon,
-                                             current_image, np.clip(reward, -1, 1))
+                                 current_image, np.clip(reward, -1, 1))
 
-            if len(self.data_set) > self.batch_size:
-                loss = self.do_training()
-                self.batch_counter += 1
-                self.loss_averages.append(loss)
+            self.epsilon = max(self.epsilon_min,
+                           self.epsilon - self.epsilon_rate)
+            loss = self.do_training()
+            self.batch_counter += 1
+            self.loss_averages.append(loss)
+            if self.total_steps % self.target_reset_frequency == 0:
+                self.network.reset_estimator()
+        else:
+            # save the data and pick one at random since we haven't hit the replay size
+            self.data_set.add_sample(self.last_image, self.last_action, reward, False)
+            int_action = self.randGenerator.randint(0, self.num_actions-1)
 
         # Map it back to ALE's actions
         return_action.intArray = [int_action]
@@ -765,9 +795,13 @@ def addScriptArguments(parser=None, in_group=False):
     group.add_argument("-m", '--momentum', dest="momentum", type=float, default=DefaultParameters.Momentum,
         action=KnowWhereYouComeFrom,
         help='Momentum term for Nesterov momentum (default: %(default)s)')    
-    group.add_argument('--rms_decay', dest="RMS_decay", type=float, default=DefaultParameters.RMSDecay, 
+    group.add_argument('--rms-decay', dest="rms_decay", type=float, default=DefaultParameters.RmsDecay, 
         action=KnowWhereYouComeFrom,
         help='Decay rate for rms_prop (default: %(default)s)')    
+    group.add_argument('--replay-start-size', dest="replay_start_size", type=int, 
+        default=DefaultParameters.ReplayStartSize,
+        action=KnowWhereYouComeFrom,
+        help='How many frames are needed till we start training (default: %(default)s)')    
     group.add_argument('-b', '--batch-size', dest="batch_size", type=int, default=DefaultParameters.BatchSize,
         action=KnowWhereYouComeFrom,
         help='Batch size (default: %(default)s)')
@@ -858,7 +892,7 @@ def main(args):
         batch_size=default_parameters.get_default(parameters, 'batch_size'),
         discount_rate=default_parameters.get_default(parameters, 'discount_rate'),
         momentum=default_parameters.get_default(parameters, 'momentum'),
-        rms_decay=default_parameters.get_default(parameters, 'RMS_decay'),
+        rms_decay=default_parameters.get_default(parameters, 'rms_decay'),
         experiment_prefix=default_parameters.get_default(parameters, 'experiment_prefix'),
         experiment_directory=default_parameters.get_default(parameters, 'experiment_directory'),
         nn_file=default_parameters.get_default(parameters, 'nn_file'),
@@ -869,6 +903,7 @@ def main(args):
         testing_epsilon=default_parameters.get_default(parameters, 'testing_epsilon'),        
         history_length=default_parameters.get_default(parameters, 'history_length'),
         max_history=default_parameters.get_default(parameters, 'history_max'),
+        replay_start_size=default_parameters.get_default(parameters, 'replay_start_size'),
         best_video=best_video,
         every_video=every_video,
         inner_video=inner_video,
