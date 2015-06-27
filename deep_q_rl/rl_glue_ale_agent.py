@@ -69,7 +69,7 @@ class KnowWhereYouComeFrom(argparse.Action):
 
 class DefaultParameters(object):
     """
-    whatever we prefer, which at the moment would be the parameters that were used for the Nature paper
+    whatever we prefer, which at the moment is something very similar to those that were used for the Nature paper
     """
 
     LearningRate = 0.00025
@@ -95,11 +95,11 @@ class DefaultParameters(object):
     # rho/RMS_DECAY to track both the history of the gradient
     # and the squared gradient.
     Momentum = 0.0
-    NetworkType = 'nature_dnn'
+    NetworkType = 'nature_cuda'
     DiscountRate = 0.99
     ReplayStartSize = 50000
     ImagePreparation = 'resize'
-    UpdateFrequency = 4
+    UpdateFrequency = 1
 
     @classmethod
     def get_default(cls, parameters, variable):
@@ -118,13 +118,17 @@ class DefaultParameters(object):
         return getattr(cls, full_name, getattr(parameters, variable, None))
 
 
+class NatureParameters(DefaultParameters):
+    NetworkType = 'nature_dnn'
+    UpdateFrequency = 4
+
 class NIPSParameters(DefaultParameters):
     UpdateRule = 'rmsprop'
     BatchAccumulator = 'mean'
     RmsEpsilon = 1e-6
     LearningRate = 0.0002
     Momentum = 0.0
-    NetworkSize = 'nips_cuda'
+    NetworkType = 'nips_cuda'
     TargetResetFrequency = 0
     DiscountRate = 0.95
     ReplayStartSize = 0
@@ -822,11 +826,13 @@ def addScriptArguments(parser=None, in_group=False):
         help='Name of the game')
 
     parameters = group.add_mutually_exclusive_group(required=False)
+    parameters.add_argument('--preferred', dest="default", action="store_true", default=False,
+        help="""Set parameters as whatever we consider best. This is the default""")    
     parameters.add_argument('--nips', dest="nips", action="store_true", default=False,
         help="""Set parameters like they used to work with this program when it was using
         DeepMind's NIPS paper's architecture (small network)""")
     parameters.add_argument('--nature', dest="nature", action="store_true", default=False,
-        help="""Set parameters similar to DeepMind's Nature paper (large network) (this is the default)""")    
+        help="""Set parameters similar to DeepMind's Nature paper (large network)""")    
 
     group.add_argument('--network-type', dest="network_type", 
         choices=['nature_cuda','nature_dnn', 'nips_cuda', 'nips_dnn','linear'],
@@ -948,6 +954,8 @@ def main(args):
 
     if parameters.nips:
         default_parameters = NIPSParameters
+    elif parameters.nature:
+        default_parameters = NatureParameters
     else:
         default_parameters = DefaultParameters
         

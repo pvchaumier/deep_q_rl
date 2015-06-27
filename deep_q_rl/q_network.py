@@ -130,7 +130,7 @@ class DeepQLearner:
     def build_network(self, network_type, input_width, input_height,
                       output_dim, num_frames, batch_size):
         if network_type == "nature_cuda":
-            return self.build_nature_network(input_width, input_height,
+            return self.build_nature_network_manual_shuffle(input_width, input_height,
                                              output_dim, num_frames, batch_size)
         if network_type == "nature_dnn":
             return self.build_nature_network_dnn(input_width, input_height,
@@ -195,6 +195,69 @@ class DeepQLearner:
     def reset_q_hat(self):
         all_params = lasagne.layers.helper.get_all_param_values(self.l_out)
         lasagne.layers.helper.set_all_param_values(self.next_l_out, all_params)
+
+
+    def build_nature_network_manual_shuffle(self, input_width, input_height, output_dim, num_frames, batch_size):
+        from lasagne.layers import cuda_convnet
+
+        l_in = lasagne.layers.InputLayer(
+                shape=(batch_size, num_frames, input_width, input_height)
+                )
+
+        l_in = cuda_convnet.bc01_to_c01b(l_in)
+
+        l_conv1 = cuda_convnet.Conv2DCCLayer(
+                l_in,
+                num_filters=32,
+                filter_size=(8,8),
+                stride=(4,4),
+                nonlinearity=lasagne.nonlinearities.rectify,
+                W=lasagne.init.HeUniform(c01b=True),
+                b=lasagne.init.Constant(0.1),
+                dimshuffle=False
+                )
+
+        l_conv2 = cuda_convnet.Conv2DCCLayer(
+                l_conv1,
+                num_filters=64,
+                filter_size=(4,4),
+                stride=(2,2),
+                nonlinearity=lasagne.nonlinearities.rectify,
+                W=lasagne.init.HeUniform(c01b=True),
+                b=lasagne.init.Constant(0.1),
+                dimshuffle=False
+                )
+
+        l_conv3 = cuda_convnet.Conv2DCCLayer(
+                l_conv2,
+                num_filters=64,
+                filter_size=(3,3),
+                stride=(1,1),
+                nonlinearity=lasagne.nonlinearities.rectify,
+                W=lasagne.init.HeUniform(c01b=True),
+                b=lasagne.init.Constant(0.1),
+                dimshuffle=False
+                )
+
+        l_conv3 = cuda_convnet.c01b_to_bc01(l_conv3)
+
+        l_hidden1 = lasagne.layers.DenseLayer(
+                l_conv3,
+                num_units=512,
+                nonlinearity=lasagne.nonlinearities.rectify,
+                W=lasagne.init.Uniform(0.01),
+                b=lasagne.init.Constant(0.1)
+                )
+
+        l_out = lasagne.layers.DenseLayer(
+                l_hidden1,
+                num_units=output_dim,
+                nonlinearity=None,
+                W=lasagne.init.Uniform(0.01),
+                b=lasagne.init.Constant(0.1)
+                )
+
+        return l_out
 
 
     def build_nature_network(self, input_width, input_height, output_dim,
