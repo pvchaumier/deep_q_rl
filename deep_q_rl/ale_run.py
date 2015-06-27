@@ -64,6 +64,9 @@ def run(parameters, unknown):
     my_env = os.environ.copy()
     my_env["RLGLUE_PORT"] = str(parameters.glue_port)
 
+    # set it for us as well since the experiment runs off this thread
+    os.environ['RLGLUE_PORT'] = str(parameters.glue_port)
+
     close_fds = True
 
     if parameters.rom.endswith('.bin'):
