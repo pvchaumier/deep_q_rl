@@ -9,69 +9,54 @@ Antonoglou, Daan Wierstra, Martin Riedmiller
 
 (Based on the sample_experiment.py from the Rl-glue python codec examples.)
 
-usage: rl_glue_ale_experiment.py [-h] [--num_epochs NUM_EPOCHS]
-                                 [--epoch_length EPOCH_LENGTH]
-                                 [--test_length TEST_LENGTH]
-
 Author: Nathan Sprague
 
 """
-import sys, argparse
+import sys
 import logging
 
 import rlglue.RLGlue as RLGlue
 
-def run_epoch(epoch, num_steps, prefix):
-    """ Run one 'epoch' of training or testing, where an epoch is defined
-    by the number of steps executed.  Prints a progress report after
-    every trial
 
-    Arguments:
-       num_steps - steps per epoch
-       prefix - string to print ('training' or 'testing')
+class AleExperiment(object):
+    def __init__(self, num_epochs, epoch_length, test_length):
+        self.num_epochs = num_epochs
+        self.epoch_length = epoch_length
+        self.test_length = test_length
 
-    """
-    steps_left = num_steps
-    while steps_left > 0:
-        logging.info("%s epoch: %s steps_left: %s" % (prefix, epoch, steps_left))
-        terminal = RLGlue.RL_episode(steps_left)
-        steps_left -= RLGlue.RL_num_steps()
+    def run(self):
+        """
+        Run the desired number of training epochs, a testing epoch
+        is conducted after each training epoch.
+        """
+        RLGlue.RL_init()
 
-
-def main(args):
-    """
-    Run the desired number of training epochs, a testing epoch
-    is conducted after each training epoch.
-    """
-    from logutils import setupLogging
-
-    parser = argparse.ArgumentParser(description='Neural rl experiment.')
-    parser.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
-                      help="Verbosity.  Invoke many times for higher verbosity")
-
-    parser.add_argument('-e', '--epochs', dest="epochs", type=int, default=100,
-                        help='Number of training epochs (default: %(default)s)')
-    parser.add_argument('-s', '--steps-per-epoch', dest="steps_per_epoch", type=int, default=50000,
-                        help='Number of steps per epoch (default: %(default)s)')
-    parser.add_argument('-t', '--test-length', dest="test_steps", type=int, default=10000,
-                        help='Number of steps per test (default: %(default)s)')
-    parameters = parser.parse_args(args)
-
-    setupLogging(parameters.verbosity)
-
-    RLGlue.RL_init()
-
-    for epoch in xrange(1, parameters.epochs + 1):
-        if parameters.steps_per_epoch > 0:
-            RLGlue.RL_agent_message("start_epoch %s" % epoch)
-            run_epoch(epoch, parameters.steps_per_epoch, "training")
-            RLGlue.RL_agent_message("finish_epoch %s" % epoch)
-
-        if parameters.test_steps > 0:
-            RLGlue.RL_agent_message("start_testing %s" % epoch)
-            run_epoch(epoch, parameters.test_steps, "testing")
-            RLGlue.RL_agent_message("finish_testing %s" % epoch)
+        for epoch in range(1, self.num_epochs + 1):
+            if self.epoch_length > 0:
+                RLGlue.RL_agent_message("start_epoch %s" % epoch)
+                self.run_epoch(epoch, self.epoch_length, "training")
+                RLGlue.RL_agent_message("finish_epoch %s" % epoch)
 
 
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+            if self.test_length > 0:
+                RLGlue.RL_agent_message("start_testing %s" % epoch)
+                self.run_epoch(epoch, self.test_length, "testing")
+                RLGlue.RL_agent_message("finish_testing %s" % epoch)
+
+    def run_epoch(self, epoch, num_steps, prefix):
+        """ Run one 'epoch' of training or testing, where an epoch is defined
+        by the number of steps executed.  Prints a progress report after
+        every trial
+
+        Arguments:
+           num_steps - steps per epoch
+           prefix - string to print ('training' or 'testing')
+
+        """
+        steps_left = num_steps
+        while steps_left > 0:
+            logging.info("%s epoch: %s steps_left: %s" % (prefix, epoch, steps_left))
+            terminal = RLGlue.RL_episode(steps_left)
+            steps_left -= RLGlue.RL_num_steps()
+
+

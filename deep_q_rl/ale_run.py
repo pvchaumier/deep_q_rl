@@ -8,6 +8,7 @@ rl_glue_ale_agent.py
 import subprocess
 import sys
 import os
+import logging
 
 from parsers import OtherScriptHelper
 from rl_glue_ale_agent import addScriptArguments
@@ -25,6 +26,8 @@ def createParser(parser=None):
     if parser is None:
         parser = OtherScriptHelper(description=__doc__)    
 
+    parser.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
+                        help="Verbosity.  Invoke many times for higher verbosity")
     parser.add_argument('-r', '--rom', dest="rom", default=DefaultROM,
                         help='ROM to run (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int, default=DefaultEpochs,
@@ -47,7 +50,17 @@ def createParser(parser=None):
 
     return parser    
 
+
+def run_experiment(epochs, steps_per_epoch, steps_per_test):
+    from rl_glue_ale_experiment import AleExperiment
+
+    experiment = AleExperiment(epochs, steps_per_epoch, steps_per_test)
+    return experiment.run()
+
 def run(parameters, unknown):
+    from logutils import setupLogging
+    setupLogging(parameters.verbosity)
+
     my_env = os.environ.copy()
     my_env["RLGLUE_PORT"] = str(parameters.glue_port)
 
@@ -63,23 +76,26 @@ def run(parameters, unknown):
 
 
     # Start the necessary processes:
-    p1 = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
+    logging.info("Starting rl_glue")
+    rlglue_process = subprocess.Popen(['rl_glue'], env=my_env, close_fds=close_fds)
     command = ['ale', '-game_controller', 'rlglue', '-send_rgb', 'true','-restricted_action_set', 'true', '-frame_skip', str(parameters.frame_skip)]
     if not parameters.merge_frames:
         command.extend(['-disable_color_averaging', 'true'])
     if parameters.display_screen:
         command.extend(['-display_screen', 'true'])        
     command.append(full_rom_path)
-    p2 = subprocess.Popen(command, env=my_env, close_fds=close_fds)
-    p3 = subprocess.Popen(['./rl_glue_ale_experiment.py', '-vv', '--steps-per-epoch', str(parameters.steps_per_epoch), 
-        '--test-length', str(parameters.test_steps), '--epochs', str(parameters.epochs)], env=my_env, close_fds=close_fds)
+    logging.info('Starting ale: %s' % ' '.join(command))
+    ale_process = subprocess.Popen(command, env=my_env, close_fds=close_fds)
     command = ['./rl_glue_ale_agent.py', '-vv', '--game-name', game_name]
-    p4 = subprocess.Popen(command + unknown, env=my_env, close_fds=close_fds)
+    logging.info('Starting agent: %s' % ' '.join(command + unknown))
+    agent_process = subprocess.Popen(command + unknown, env=my_env, close_fds=close_fds)
 
-    p1.wait()
-    p2.wait()
-    p3.wait()
-    p4.wait()
+    logging.info("Starting experiment")
+    run_experiment(parameters.epochs, parameters.steps_per_epoch, parameters.test_steps)
+
+    rlglue_process.wait()
+    ale_process.wait()
+    agent_process.wait()
 
     return 0    
 

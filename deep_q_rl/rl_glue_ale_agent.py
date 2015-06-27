@@ -68,24 +68,38 @@ class KnowWhereYouComeFrom(argparse.Action):
 
 
 class DefaultParameters(object):
+    """
+    whatever we prefer, which at the moment would be the parameters that were used for the Nature paper
+    """
+
     LearningRate = 0.00025
 
+    UpdateRule = 'deepmind_rmsprop'
+    BatchAccumulator = 'sum'
     RmsDecay = 0.95
+    RmsEpsilon = 0.01
     EpsilonStart = 1.0
     EpsilonMin = 0.1
     EpsilonDecay = 1000000
     TestingEpsilon = 0.01
     HistoryLength = 4
-    HistoryMax = 1000000
+    ReplayMemorySize = 1000000
     BatchSize = 32
     PauseTime = 0
     TargetResetFrequency = 10000
-    Momentum = 0.95
-    NetworkSize = 'big'
-    #NetworkSize = 'big_cudnn'
+
+    # Note that the "momentum" value mentioned in the Nature
+    # paper is not used in the same way as a traditional momentum
+    # term.  It is used to track gradient for the purpose of
+    # estimating the standard deviation. This package uses
+    # rho/RMS_DECAY to track both the history of the gradient
+    # and the squared gradient.
+    Momentum = 0.0
+    NetworkType = 'nature_dnn'
     DiscountRate = 0.99
     ReplayStartSize = 50000
     ImagePreparation = 'resize'
+    UpdateFrequency = 4
 
     @classmethod
     def get_default(cls, parameters, variable):
@@ -105,21 +119,26 @@ class DefaultParameters(object):
 
 
 class NIPSParameters(DefaultParameters):
-
+    UpdateRule = 'rmsprop'
+    BatchAccumulator = 'mean'
+    RmsEpsilon = 1e-6
     LearningRate = 0.0002
     Momentum = 0.0
-    NetworkSize = 'small'
+    NetworkSize = 'nips_cuda'
     TargetResetFrequency = 0
     DiscountRate = 0.95
     ReplayStartSize = 0
     ImagePreparation = 'crop'
+    UpdateFrequency = 1
 
 
 class NeuralAgent(Agent):
     randGenerator=random.Random()
 
 
-    def __init__(self, game_name, network_size=DefaultParameters.NetworkSize,
+    def __init__(self, game_name, 
+        network_type=DefaultParameters.NetworkType,
+        update_rule=DefaultParameters.UpdateRule,
         learning_rate=DefaultParameters.LearningRate,
         batch_size=DefaultParameters.BatchSize,
         discount_rate=DefaultParameters.DiscountRate,
@@ -132,10 +151,13 @@ class NeuralAgent(Agent):
         epsilon_start=DefaultParameters.EpsilonStart,
         epsilon_min=DefaultParameters.EpsilonMin,
         epsilon_decay=DefaultParameters.EpsilonDecay,
+        rms_epsilon=DefaultParameters.RmsEpsilon,
         testing_epsilon=DefaultParameters.TestingEpsilon,
         history_length=DefaultParameters.HistoryLength,
-        max_history=DefaultParameters.HistoryMax,
+        replay_memory_size=DefaultParameters.ReplayMemorySize,
         replay_start_size=DefaultParameters.ReplayStartSize,
+        batch_accumulator=DefaultParameters.BatchAccumulator,
+        update_frequency=DefaultParameters.UpdateFrequency,
         best_video=True,
         every_video=False,
         inner_video=False,
@@ -146,21 +168,24 @@ class NeuralAgent(Agent):
 
 
         self.game_name = game_name
-        self.network_size = network_size
-        self.learning_rate=learning_rate
+        self.network_type = network_type
+        self.update_rule = update_rule
+        self.learning_rate = learning_rate
         self.momentum = momentum
         self.rms_decay = rms_decay
-        self.batch_size=batch_size
-        self.discount=discount_rate
-        self.experiment_prefix=experiment_prefix
-        self.nn_file=nn_file
-        self.pause=pause
-        self.epsilon_start=epsilon_start
-        self.epsilon_min=epsilon_min
-        self.epsilon_decay=epsilon_decay
-        self.phi_length=history_length
-        self.max_history=max_history
+        self.rms_epsilon = rms_epsilon
+        self.batch_size = batch_size
+        self.discount = discount_rate
+        self.experiment_prefix = experiment_prefix
+        self.nn_file = nn_file
+        self.pause = pause
+        self.epsilon_start = epsilon_start
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
+        self.phi_length = history_length
+        self.replay_memory_size = replay_memory_size
         self.testing_epsilon = testing_epsilon
+        self.batch_accumulator = batch_accumulator
         self.best_video = best_video
         self.inner_video = inner_video
         self.every_video = every_video
@@ -169,6 +194,7 @@ class NeuralAgent(Agent):
         self.target_reset_frequency = target_reset_frequency
         self.replay_start_size = max(replay_start_size, self.batch_size)
         self.image_preparation = image_preparation
+        self.update_frequency = update_frequency
 
         if image_preparation == 'crop':
             self.preprocess_observation = self._preprocess_observation_cropped_by_cv
@@ -208,6 +234,15 @@ class NeuralAgent(Agent):
 
         self.learning_file = self.results_file = None
 
+        # shut pylint up
+        self.current_epoch = self.last_action = self.loss_averages = self.testing = self.epoch_considered_q = \
+        self.total_steps = self.total_reward = self.num_actions = self.episode_q = self._crop_y = \
+        self.episode_reward = self.network = self.batch_counter = self.start_time = self.episode_inner_images = \
+        self.episode_chosen_steps = self.best_score_ever = self.epsilon = self.holdout_data = self.step_counter = \
+        self.test_data_set = self.last_image = self.epoch_considered_steps = self.episode_images = \
+        self.best_epoch_reward = self.best_run_inner_images = self.data_set = self.episode_counter = \
+        self.best_run_images = self.epsilon_rate = None
+
 
     def record_parameters(self):
         import subprocess
@@ -218,9 +253,9 @@ class NeuralAgent(Agent):
             gitlog = subprocess.check_output('git log -n 1 --oneline'.split()).strip()
             parameters_file.write('Last commit: %s\n' % gitlog)
 
-            for variable in 'game_name network_size learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length max_history testing_epsilon target_reset_frequency replay_start_size image_preparation'.split():
+            for variable in sorted('game_name network_type learning_rate momentum rms_decay batch_size discount nn_file pause epsilon_start epsilon_min epsilon_decay phi_length replay_memory_size testing_epsilon target_reset_frequency replay_start_size image_preparation batch_accumulator update_rule rms_epsilon update_frequency'.split()):
                 parameters_file.write('%s: %s\n' % (variable, getattr(self, variable)))
-
+                logging.info('%s: %s' % (variable, getattr(self, variable)))
 
         gitdiff = subprocess.check_output('git diff'.split()).strip()
         if gitdiff:
@@ -261,7 +296,7 @@ class NeuralAgent(Agent):
 
         self.data_set = ale_data_set.DataSet(width=CROPPED_SIZE,
                                              height=CROPPED_SIZE,
-                                             max_steps=self.max_history,
+                                             max_steps=self.replay_memory_size,
                                              phi_length=self.phi_length)
 
         # just needs to be big enough to create phi's
@@ -353,30 +388,22 @@ class NeuralAgent(Agent):
         """
 
         from q_network import DeepQLearner
-        #from network import DeepQLearner
-
-        if self.network_size == 'big':
-             network_type = 'nature_dnn'
-        else:
-             network_type = 'nips_dnn'
-
 
         return DeepQLearner(CROPPED_SIZE, 
                             CROPPED_SIZE, 
                             self.num_actions, 
                             self.phi_length, 
+                            update_rule=self.update_rule,
                             batch_size=self.batch_size,
                             discount=self.discount,
                             learning_rate=self.learning_rate,
                             rho=self.rms_decay,
-                            #decay=self.rms_decay,
                             momentum=self.momentum,
-                            #size=self.network_size,
-                            network_type=network_type,
-                            #separate_evaluator=(self.target_reset_frequency > 0)
-                            freeze_interval=self.target_reset_frequency
+                            network_type=self.network_type,
+                            freeze_interval=self.target_reset_frequency,
+                            rms_epsilon=self.rms_epsilon,
+                            batch_accumulator=self.batch_accumulator
                             )
-
 
     def _open_results_file(self):
         if self.learning_log:
@@ -450,7 +477,7 @@ class NeuralAgent(Agent):
 
 
     def _preprocess_observation_cropped_by_cv(self, observation):
-        # reshape linear to original image size
+        # reshape linear to original image size, skipping the RAM portion
         image = observation[128:].reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
         # convert from int32s
         image = np.array(image, dtype="uint8")
@@ -533,13 +560,15 @@ class NeuralAgent(Agent):
 
             self.epsilon = max(self.epsilon_min,
                            self.epsilon - self.epsilon_rate)
-            loss = self.do_training()
-            self.batch_counter += 1
-            self.loss_averages.append(loss)
+
+            if self.step_counter % self.update_frequency == 0:
+                loss = self.do_training()
+                self.batch_counter += 1
+                self.loss_averages.append(loss)
         else:
             # save the data and pick one at random since we haven't hit the replay size
-            self.data_set.add_sample(self.last_image, self.last_action, reward, False)
-            int_action = self.randGenerator.randint(0, self.num_actions-1)
+            int_action, considered = self.choose_action(self.data_set, 1.0,
+                                 current_image, np.clip(reward, -1, 1))
 
         # Map it back to ALE's actions
         return_action.intArray = [int_action]
@@ -599,6 +628,9 @@ class NeuralAgent(Agent):
         total_time = time.time() - self.start_time
 
         if self.testing:
+            logging.info("Simulated at a rate of {} frames/s".format(\
+                self.step_counter / total_time))
+
             self.episode_reward += reward
             if self.best_epoch_reward is None or self.episode_reward > self.best_epoch_reward:
                 self.best_epoch_reward = self.episode_reward
@@ -785,6 +817,10 @@ def addScriptArguments(parser=None, in_group=False):
     group.add_argument("-v", "--verbose", dest="verbosity", default=0, action="count",
                       help="Verbosity.  Invoke many times for higher verbosity")
 
+
+    group.add_argument("-g", '--game-name', dest="game_name", default=None,
+        help='Name of the game')
+
     parameters = group.add_mutually_exclusive_group(required=False)
     parameters.add_argument('--nips', dest="nips", action="store_true", default=False,
         help="""Set parameters like they used to work with this program when it was using
@@ -792,8 +828,15 @@ def addScriptArguments(parser=None, in_group=False):
     parameters.add_argument('--nature', dest="nature", action="store_true", default=False,
         help="""Set parameters similar to DeepMind's Nature paper (large network) (this is the default)""")    
 
-    group.add_argument("-g", '--game-name', dest="game_name", default=None,
-        help='Name of the game')
+    group.add_argument('--network-type', dest="network_type", 
+        choices=['nature_cuda','nature_dnn', 'nips_cuda', 'nips_dnn','linear'],
+        default=DefaultParameters.NetworkType,
+        action=KnowWhereYouComeFrom,
+        help="Type of network to use (default: %(default)s)'")
+    group.add_argument('--update-rule', dest="update_rule", choices=['deepmind_rmsprop','rmsprop','sgd'],
+        action=KnowWhereYouComeFrom,
+        default=DefaultParameters.UpdateRule,
+        help="Update rule to use (default: %(default)s)'")    
     group.add_argument("-lr", '--learning-rate', dest="learning_rate", type=float, action=KnowWhereYouComeFrom,
         default=DefaultParameters.LearningRate,
         help='Learning rate (default: %(default)s)')
@@ -806,6 +849,9 @@ def addScriptArguments(parser=None, in_group=False):
     group.add_argument('--rms-decay', dest="rms_decay", type=float, default=DefaultParameters.RmsDecay, 
         action=KnowWhereYouComeFrom,
         help='Decay rate for rms_prop (default: %(default)s)')    
+    group.add_argument('--rms-epsilon', dest="rms_epsilon", type=float, default=DefaultParameters.RmsEpsilon, 
+        action=KnowWhereYouComeFrom,
+        help='Denominator epsilon for RMSProp (default: %(default)s)')        
     group.add_argument('--replay-start-size', dest="replay_start_size", type=int, 
         default=DefaultParameters.ReplayStartSize,
         action=KnowWhereYouComeFrom,
@@ -846,12 +892,21 @@ def addScriptArguments(parser=None, in_group=False):
     group.add_argument("-hl", '--history-length', dest="history_length", type=int, default=DefaultParameters.HistoryLength,
         action=KnowWhereYouComeFrom,
         help='History length (default: %(default)s)')
-    group.add_argument('--max-history', dest="history_max", type=int, default=DefaultParameters.HistoryMax,
+    group.add_argument('--replay-memory-size', dest="replay_memory_size", type=int, default=DefaultParameters.ReplayMemorySize,
         action=KnowWhereYouComeFrom,
         help='Maximum number of steps stored (default: %(default)s)')
     group.add_argument('-tr', '--target-reset-frequency', dest="target_reset_frequency", type=int, default=DefaultParameters.TargetResetFrequency,
         action=KnowWhereYouComeFrom,
         help="How often to copy the current training network parameters into the estimator of goodness network, in frames. 0 to not use different networks (default: %(default)s)")
+    group.add_argument('--update-frequency', dest="update_frequency", type=int, 
+        default=DefaultParameters.UpdateFrequency,
+        action=KnowWhereYouComeFrom,
+        help='Number of actions before each training update. (default: %(default)s)')
+
+    group.add_argument('--batch-accumulator', dest="batch_accumulator", choices=['sum', 'mean'],         
+        action=KnowWhereYouComeFrom,
+        default=DefaultParameters.BatchAccumulator,
+        help='Batch accumulator for calculating error, because why not(default: %(default)s)')
     group.add_argument('--no-video', dest="video", default=True, action="store_false",
         help='Do not make a "video" record of the best run in each testing epoch')    
     group.add_argument('--every-video', dest="every_video", default=False, action="store_true",
@@ -899,12 +954,14 @@ def main(args):
 
 
     AgentLoader.loadAgent(NeuralAgent(parameters.game_name,
-        network_size=default_parameters.get_default(parameters, 'network_size'),
+        network_type=default_parameters.get_default(parameters, 'network_type'),
+        update_rule =default_parameters.get_default(parameters, 'update_rule'),
         learning_rate=default_parameters.get_default(parameters, 'learning_rate'),
         batch_size=default_parameters.get_default(parameters, 'batch_size'),
         discount_rate=default_parameters.get_default(parameters, 'discount_rate'),
         momentum=default_parameters.get_default(parameters, 'momentum'),
         rms_decay=default_parameters.get_default(parameters, 'rms_decay'),
+        rms_epsilon=default_parameters.get_default(parameters, 'rms_epsilon'),
         experiment_prefix=default_parameters.get_default(parameters, 'experiment_prefix'),
         experiment_directory=default_parameters.get_default(parameters, 'experiment_directory'),
         nn_file=default_parameters.get_default(parameters, 'nn_file'),
@@ -914,8 +971,10 @@ def main(args):
         epsilon_decay=default_parameters.get_default(parameters, 'epsilon_decay'),
         testing_epsilon=default_parameters.get_default(parameters, 'testing_epsilon'),        
         history_length=default_parameters.get_default(parameters, 'history_length'),
-        max_history=default_parameters.get_default(parameters, 'history_max'),
+        replay_memory_size=default_parameters.get_default(parameters, 'replay_memory_size'),
         replay_start_size=default_parameters.get_default(parameters, 'replay_start_size'),
+        batch_accumulator=default_parameters.get_default(parameters, 'batch_accumulator'),
+        update_frequency=default_parameters.get_default(parameters, 'update_frequency'),
         best_video=best_video,
         every_video=every_video,
         inner_video=inner_video,
