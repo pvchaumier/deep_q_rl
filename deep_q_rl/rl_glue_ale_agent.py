@@ -571,7 +571,7 @@ class NeuralAgent(Agent):
                 self.loss_averages.append(loss)
         else:
             # save the data and pick one at random since we haven't hit the replay size
-            int_action, considered = self.choose_action(self.data_set, 1.0,
+            int_action, considered = self.choose_action(self.data_set, self.epsilon,
                                  current_image, np.clip(reward, -1, 1))
 
         # Map it back to ALE's actions
