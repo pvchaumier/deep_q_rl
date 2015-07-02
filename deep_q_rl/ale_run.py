@@ -18,7 +18,7 @@ DefaultBaseROMPath = "../roms/"
 DefaultROM = 'breakout.bin'
 DefaultPort = 4096
 DefaultStepsPerEpoch = 50000
-DefaultEpochs = 300
+DefaultEpochs = 3000
 DefaultStepsPerTest = 10000
 DefaultFrameSkip = 4
 
