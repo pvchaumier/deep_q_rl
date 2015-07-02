@@ -30,6 +30,7 @@ class AleExperiment(object):
         is conducted after each training epoch.
         """
         RLGlue.RL_init()
+        RLGlue.RL_start()
 
         for epoch in range(1, self.num_epochs + 1):
             if self.epoch_length > 0:
@@ -42,6 +43,9 @@ class AleExperiment(object):
                 RLGlue.RL_agent_message("start_testing %s" % epoch)
                 self.run_epoch(epoch, self.test_length, "testing")
                 RLGlue.RL_agent_message("finish_testing %s" % epoch)
+
+        RLGlue.RL_cleanup()
+
 
     def run_epoch(self, epoch, num_steps, prefix):
         """ Run one 'epoch' of training or testing, where an epoch is defined
