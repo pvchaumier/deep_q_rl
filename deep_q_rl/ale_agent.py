@@ -22,7 +22,8 @@ class NeuralAgent(object):
 
     def __init__(self, q_network, epsilon_start, epsilon_min,
                  epsilon_decay, replay_memory_size, exp_pref,
-                 replay_start_size, update_frequency, rng, experiment_directory=None):
+                 replay_start_size, update_frequency, rng, 
+                 experiment_directory=None, recording=True):
 
         self.network = q_network
         self.epsilon_start = epsilon_start
@@ -38,19 +39,22 @@ class NeuralAgent(object):
         self.image_width = self.network.input_width
         self.image_height = self.network.input_height
 
-        # CREATE A FOLDER TO HOLD RESULTS
-        time_str = time.strftime("_%m-%d-%H-%M_", time.gmtime())
-        if experiment_directory is None:
-            self.exp_dir = self.exp_pref + time_str + \
-                       "{}".format(self.network.lr).replace(".", "p") + "_" \
-                       + "{}".format(self.network.discount).replace(".", "p")
-        else:
-            self.exp_dir = experiment_directory
+        self.recording = recording
 
-        try:
-            os.stat(self.exp_dir)
-        except OSError:
-            os.makedirs(self.exp_dir)
+        if self.recording:
+            # CREATE A FOLDER TO HOLD RESULTS
+            time_str = time.strftime("_%m-%d-%H-%M_", time.gmtime())
+            if experiment_directory is None:
+                self.exp_dir = self.exp_pref + time_str + \
+                           "{}".format(self.network.lr).replace(".", "p") + "_" \
+                           + "{}".format(self.network.discount).replace(".", "p")
+            else:
+                self.exp_dir = experiment_directory
+
+            try:
+                os.stat(self.exp_dir)
+            except OSError:
+                os.makedirs(self.exp_dir)
 
         self.num_actions = self.network.num_actions
 
@@ -91,6 +95,8 @@ class NeuralAgent(object):
         self.last_action = None
 
     def _open_results_file(self):
+        if not self.recording:
+            return
         logging.info("OPENING " + self.exp_dir + '/results.csv')
         self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
         self.results_file.write(\
@@ -98,11 +104,15 @@ class NeuralAgent(object):
         self.results_file.flush()
 
     def _open_learning_file(self):
+        if not self.recording:
+            return
         self.learning_file = open(self.exp_dir + '/learning.csv', 'w', 0)
         self.learning_file.write('mean_loss,epsilon\n')
         self.learning_file.flush()
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
+        if not self.recording:
+            return
         out = "{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
                                         self.total_reward / float(num_episodes),
                                         holdout_sum)
@@ -110,6 +120,8 @@ class NeuralAgent(object):
         self.results_file.flush()
 
     def _update_learning_file(self):
+        if not self.recording:
+            return
         out = "{},{}\n".format(np.mean(self.loss_averages),
                                self.epsilon)
         self.learning_file.write(out)
@@ -273,6 +285,8 @@ class NeuralAgent(object):
 
 
     def finish_epoch(self, epoch):
+        if not self.recording:
+            return
         net_file = open(self.exp_dir + '/network_file_' + str(epoch) + \
                         '.pkl', 'w')
         cPickle.dump(self.network, net_file, -1)

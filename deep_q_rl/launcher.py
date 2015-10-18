@@ -143,6 +143,10 @@ def process_args(args, defaults, description):
         help=('Specify exact directory where to save output to ' +
             '(default: combination of prefix and game name and current ' +
             'date and parameters)'))    
+    parser.add_argument('--no-record', dest="recording", default=True, 
+        action="store_false",
+        help=('Do not record anything about the experiment ' +
+            '(best games, epoch networks, test results, etc)'))
 
 
     parameters = parser.parse_args(args)
@@ -240,7 +244,8 @@ def launch(args, defaults, description):
                                   parameters.replay_start_size,
                                   parameters.update_frequency,
                                   rng,
-                                  experiment_directory=parameters.experiment_directory)
+                                  experiment_directory=parameters.experiment_directory,
+                                  recording=parameters.recording)
 
     experiment = ale_experiment.ALEExperiment(ale, agent,
                                               defaults.RESIZED_WIDTH,
