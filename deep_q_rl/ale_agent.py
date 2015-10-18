@@ -25,6 +25,8 @@ class NeuralAgent(object):
                  replay_start_size, update_frequency, rng, 
                  experiment_directory=None, recording=True):
 
+        self.results_file = self.learning_file = None
+
         self.network = q_network
         self.epsilon_start = epsilon_start
         self.epsilon_min = epsilon_min
@@ -338,6 +340,19 @@ class NeuralAgent(object):
 
         self._update_results_file(epoch, self.episode_counter,
                                   holdout_sum / holdout_size)
+
+
+    def cleanup(self):
+        """
+        Called once at the end of an experiment.  We could save results
+        here, but we use the agent_message mechanism instead so that
+        a file name can be provided by the experiment.
+        """
+
+        if self.learning_file:
+            self.learning_file.close()
+        if self.results_file:
+            self.results_file.close()
 
 
 if __name__ == "__main__":
