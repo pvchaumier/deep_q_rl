@@ -26,6 +26,7 @@ class NeuralAgent(object):
                  experiment_directory=None, recording=True):
 
         self.results_file = self.learning_file = None
+        self.best_epoch_reward = None
 
         self.network = q_network
         self.epsilon_start = epsilon_start
@@ -104,7 +105,7 @@ class NeuralAgent(object):
         logging.info("OPENING " + self.exp_dir + '/results.csv')
         self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
         self.results_file.write(\
-            'epoch,num_episodes,total_reward,reward_per_epoch,mean_q\n')
+            'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q\n')
         self.results_file.flush()
 
     def _open_learning_file(self):
@@ -117,8 +118,9 @@ class NeuralAgent(object):
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
         if not self.recording:
             return
-        out = "{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
-                                        self.total_reward / float(num_episodes),
+        out = "{},{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
+                                        self.total_reward / max(1.0, float(num_episodes)),
+                                        self.best_epoch_reward,
                                         holdout_sum)
         self.results_file.write(out)
         self.results_file.flush()
@@ -295,6 +297,10 @@ class NeuralAgent(object):
             if terminal or self.episode_counter == 0:
                 self.episode_counter += 1
                 self.total_reward += self.episode_reward
+
+            # keep track of the best reward for the epoch
+            if self.best_epoch_reward is None or self.episode_reward > self.best_epoch_reward:
+                self.best_epoch_reward = self.episode_reward
         else:
 
             # Store the latest sample.
@@ -324,6 +330,7 @@ class NeuralAgent(object):
         self.testing = True
         self.total_reward = 0
         self.episode_counter = 0
+        self.best_epoch_reward = None
 
     def finish_testing(self, epoch):
         self.testing = False
