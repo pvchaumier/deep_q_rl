@@ -138,6 +138,12 @@ def process_args(args, defaults, description):
                         type=bool, default=defaults.CUDNN_DETERMINISTIC,
                         help=('Whether to use deterministic backprop. ' +
                               '(default: %(default)s)'))
+    parser.add_argument('--experiment-directory', dest="experiment_directory", 
+        default=None,
+        help=('Specify exact directory where to save output to ' +
+            '(default: combination of prefix and game name and current ' +
+            'date and parameters)'))    
+
 
     parameters = parser.parse_args(args)
     if parameters.experiment_prefix is None:
@@ -233,7 +239,8 @@ def launch(args, defaults, description):
                                   parameters.experiment_prefix,
                                   parameters.replay_start_size,
                                   parameters.update_frequency,
-                                  rng)
+                                  rng,
+                                  experiment_directory=parameters.experiment_directory)
 
     experiment = ale_experiment.ALEExperiment(ale, agent,
                                               defaults.RESIZED_WIDTH,
