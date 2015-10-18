@@ -55,6 +55,8 @@ class NeuralAgent(object):
                 os.stat(self.exp_dir)
             except OSError:
                 os.makedirs(self.exp_dir)
+            self.record_parameters()
+
 
         self.num_actions = self.network.num_actions
 
@@ -155,6 +157,30 @@ class NeuralAgent(object):
         self.last_img = observation
 
         return return_action
+
+
+    def record_parameters(self):
+        if not self.recording:
+            return
+
+        import subprocess
+
+        parameters_filename = os.path.join(self.exp_dir, 'parameters.txt')
+        with open(parameters_filename, 'w') as parameters_file:
+            # write the commit we are at
+            gitlog = subprocess.check_output('git log -n 1 --oneline'.split()).strip()
+            parameters_file.write('Last commit: %s\n' % gitlog)
+
+            for variable in sorted('epsilon_start epsilon_min epsilon_decay phi_length replay_memory_size   replay_start_size update_frequency'.split()):
+                parameters_file.write('%s: %s\n' % (variable, getattr(self, variable)))
+                logging.info('%s: %s' % (variable, getattr(self, variable)))
+
+        gitdiff = subprocess.check_output('git diff'.split()).strip()
+        if gitdiff:
+            diff_filename = os.path.join(self.exp_dir, 'difftogit.txt')
+            with open(diff_filename, 'w') as diff_file:
+                diff_file.write(gitdiff)
+                diff_file.write('\n')
 
 
     def _show_phis(self, phi1, phi2):
