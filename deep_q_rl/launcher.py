@@ -148,8 +148,13 @@ def process_args(args, defaults, description):
         action="store_false",
         help=('Do not record anything about the experiment ' +
             '(best games, epoch networks, test results, etc)'))
-    parser.add_argument('--record-video', dest="record_video", default=False, action="store_true",
+    parser.add_argument('--record-video', dest="record_video", 
+        default=False, action="store_true",
         help='Record screen captures')
+    parser.add_argument('--episodes', dest="episodes", default=False, 
+        action="store_true",
+        help=('This changes the lengths of training epochs and test ' +
+        'epochs to be measured in episodes (games) instead of steps'))
 
 
     parameters = parser.parse_args(args)
@@ -234,7 +239,7 @@ def launch(args, defaults, description):
             ale.setString("record_sound_filename", os.path.join(video_directory, "sound.wav"))
             # "We set fragsize to 64 to ensure proper sound sync"
             # (that's what videoRecordingExample.cpp in ALE says. I don't really know what it means)
-            ale.setInt("fragsize", 64);
+            ale.setInt("fragsize", 64)
 
     ale.loadROM(full_rom_path)
 
@@ -282,7 +287,8 @@ def launch(args, defaults, description):
                                               parameters.frame_skip,
                                               parameters.death_ends_episode,
                                               parameters.max_start_nullops,
-                                              rng)
+                                              rng,
+                                              length_in_episodes=parameters.episodes)
 
     experiment.run()
 

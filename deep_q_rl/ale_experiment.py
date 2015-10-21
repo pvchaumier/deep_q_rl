@@ -17,7 +17,8 @@ CROP_OFFSET = 8
 class ALEExperiment(object):
     def __init__(self, ale, agent, resized_width, resized_height,
                  resize_method, num_epochs, epoch_length, test_length,
-                 frame_skip, death_ends_episode, max_start_nullops, rng):
+                 frame_skip, death_ends_episode, max_start_nullops, rng,
+                 length_in_episodes=False):
         self.ale = ale
         self.agent = agent
         self.num_epochs = num_epochs
@@ -40,6 +41,10 @@ class ALEExperiment(object):
         self.terminal_lol = False # Most recent episode ended on a loss of life
         self.max_start_nullops = max_start_nullops
         self.rng = rng
+
+        # Whether the lengths (test_length and epoch_length) are specified in 
+        # episodes. This is mainly for testing
+        self.length_in_episodes = length_in_episodes 
 
     def run(self):
         """
@@ -146,12 +151,17 @@ class ALEExperiment(object):
             terminal = self.ale.game_over() or self.terminal_lol
             num_steps += 1
 
-            if terminal or num_steps >= max_steps:
+            if terminal or num_steps >= max_steps and not self.length_in_episodes:
                 self.agent.end_episode(reward, terminal)
                 break
 
             action = self.agent.step(reward, self.get_observation())
-        return terminal, num_steps
+
+        # if the lengths are in episodes, this episode counts as 1 "step"
+        if self.length_in_episodes:
+            return terminal, 1
+        else:
+            return terminal, num_steps
 
 
     def get_observation(self):
