@@ -4,9 +4,10 @@ training process.  It shouldn't be executed directly; it is used by
 run_nips.py or run_nature.py.
 
 """
-import os
+import os, sys
 import argparse
 import logging
+import time
 import ale_python_interface
 import cPickle
 import numpy as np
@@ -147,6 +148,8 @@ def process_args(args, defaults, description):
         action="store_false",
         help=('Do not record anything about the experiment ' +
             '(best games, epoch networks, test results, etc)'))
+    parser.add_argument('--record-video', dest="record_video", default=False, action="store_true",
+        help='Record screen captures')
 
 
     parameters = parser.parse_args(args)
@@ -182,6 +185,7 @@ def launch(args, defaults, description):
     logging.basicConfig(level=logging.INFO)
     parameters = process_args(args, defaults, description)
 
+
     if parameters.rom.endswith('.bin'):
         rom = parameters.rom
     else:
@@ -196,11 +200,18 @@ def launch(args, defaults, description):
     if parameters.cudnn_deterministic:
         theano.config.dnn.conv.algo_bwd = 'deterministic'
 
+
+    if parameters.experiment_directory:
+        experiment_directory = parameters.experiment_directory
+    else:    
+        time_str = time.strftime("_%Y-%m-%d-%H-%M", time.gmtime())
+        experiment_directory = parameters.experiment_prefix + time_str
+
+
     ale = ale_python_interface.ALEInterface()
     ale.setInt('random_seed', rng.randint(1000))
 
     if parameters.display_screen:
-        import sys
         if sys.platform == 'darwin':
             import pygame
             pygame.init()
@@ -209,6 +220,21 @@ def launch(args, defaults, description):
     ale.setBool('display_screen', parameters.display_screen)
     ale.setFloat('repeat_action_probability',
                  parameters.repeat_action_probability)
+
+    if parameters.record_video:
+        video_directory = os.path.join(experiment_directory, 'video')
+        if not os.path.isdir(video_directory):
+            os.makedirs(video_directory)
+
+
+        ale.setString('record_screen_dir', video_directory)
+
+        if sys.platform != 'darwin':
+            ale.setBool('sound', True)
+            ale.setString("record_sound_filename", os.path.join(video_directory, "sound.wav"))
+            # "We set fragsize to 64 to ensure proper sound sync"
+            # (that's what videoRecordingExample.cpp in ALE says. I don't really know what it means)
+            ale.setInt("fragsize", 64);
 
     ale.loadROM(full_rom_path)
 
@@ -240,11 +266,10 @@ def launch(args, defaults, description):
                                   parameters.epsilon_min,
                                   parameters.epsilon_decay,
                                   parameters.replay_memory_size,
-                                  parameters.experiment_prefix,
+                                  experiment_directory,
                                   parameters.replay_start_size,
                                   parameters.update_frequency,
                                   rng,
-                                  experiment_directory=parameters.experiment_directory,
                                   recording=parameters.recording)
 
     experiment = ale_experiment.ALEExperiment(ale, agent,
@@ -258,7 +283,6 @@ def launch(args, defaults, description):
                                               parameters.death_ends_episode,
                                               parameters.max_start_nullops,
                                               rng)
-
 
     experiment.run()
 
