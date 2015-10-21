@@ -209,7 +209,7 @@ def launch(args, defaults, description):
     if parameters.experiment_directory:
         experiment_directory = parameters.experiment_directory
     else:    
-        time_str = time.strftime("_%Y-%m-%d-%H-%M", time.gmtime())
+        time_str = time.strftime("_%Y-%m-%d-%H-%M", time.time())
         experiment_directory = parameters.experiment_prefix + time_str
 
 
