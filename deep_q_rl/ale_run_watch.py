@@ -12,14 +12,19 @@ import argparse
 def run_watch(args):
 
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--no-screen', dest="screen", default=True, action="store_false",
+                        help="Don't show the screen. Only option that should come before the network")        
     parser.add_argument('networkfile', nargs=1,
                         help='Network file')
     parameters, unknown = parser.parse_known_args(args)
 
 
     command = ['./run_nature.py', '--steps-per-epoch', '0',
-               '--nn-file', parameters.networkfile[0],
-               '--display-screen'] + unknown
+               '--nn-file', parameters.networkfile[0]]
+    if parameters.screen:
+        command.append('--display-screen')
+
+    command += unknown
 
     p1 = subprocess.Popen(command)
     
