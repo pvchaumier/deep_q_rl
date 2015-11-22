@@ -49,7 +49,6 @@ class DeepQLearner:
         # Using Double DQN is pointless without periodic freezing
         if self.use_double:
             assert self.freeze_interval > 0
-            # pass
 
         lasagne.random.set_rng(self.rng)
 
@@ -92,11 +91,9 @@ class DeepQLearner:
         q_vals = lasagne.layers.get_output(self.l_out, states / input_scale)
         
         if self.freeze_interval > 0:
-            # Nature. If using periodic freezing
             next_q_vals = lasagne.layers.get_output(self.next_l_out,
                                                     next_states / input_scale)
         else:
-            # NIPS
             next_q_vals = lasagne.layers.get_output(self.l_out,
                                                     next_states / input_scale)
             next_q_vals = theano.gradient.disconnected_grad(next_q_vals)
@@ -160,38 +157,10 @@ class DeepQLearner:
             updates = lasagne.updates.apply_momentum(updates, None,
                                                      self.momentum)
 
-        def inspect_inputs(i, node, fn):
-            if ('maxand' not in str(node).lower() and '12345' not in str(node)):
-                return
-            print i, node, "input(s) value(s):", [input[0] for input in fn.inputs],
-            raw_input('press enter')
-
-        def inspect_outputs(i, node, fn):
-            if ('maxand' not in str(node).lower() and '12345' not in str(node)):
-                return
-            if '12345' in str(node):
-                print "output(s) value(s):", [np.asarray(output[0]) for output in fn.outputs]
-            else:
-                print "output(s) value(s):", [output[0] for output in fn.outputs]
-            raw_input('press enter')
-
-        if False:
-            self._train = theano.function([], [loss, q_vals], updates=updates,
-                                          givens=givens, mode=theano.compile.MonitorMode(
-                            pre_func=inspect_inputs,
-                            post_func=inspect_outputs))
-            theano.printing.debugprint(target)
-        else:
-            self._train = theano.function([], [loss, q_vals], updates=updates,
-                                          givens=givens)
-        if False:
-            self._q_vals = theano.function([], q_vals,
-                                           givens={states: self.states_shared}, mode=theano.compile.MonitorMode(
-                            pre_func=inspect_inputs,
-                            post_func=inspect_outputs))
-        else:
-            self._q_vals = theano.function([], q_vals,
-                                           givens={states: self.states_shared})
+        self._train = theano.function([], [loss, q_vals], updates=updates,
+                                      givens=givens)
+        self._q_vals = theano.function([], q_vals,
+                                       givens={states: self.states_shared})
 
     def build_network(self, network_type, input_width, input_height,
                       output_dim, num_frames, batch_size):
@@ -256,18 +225,6 @@ class DeepQLearner:
         if self.rng.rand() < epsilon:
             return self.rng.randint(0, self.num_actions)
         q_vals = self.q_vals(state)
-        scaled_q = q_vals - np.min(q_vals)
-        scaled_q = scaled_q / np.max(scaled_q)
-        for cmpi in range(1*15, -1, -1):
-            cmpval = float(cmpi) / 15
-            line = ''
-            for i in range(4):
-                if scaled_q[i] > cmpval:
-                    line += '####'
-                line += '\t'
-            print line
-        print 'noop\tfire\tright\tleft'
-        print q_vals
         return np.argmax(q_vals)
 
     def reset_q_hat(self):
