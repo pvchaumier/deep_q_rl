@@ -60,7 +60,7 @@ class Defaults:
     MAX_START_NULLOPS = 30
     DETERMINISTIC = True
     CUDNN_DETERMINISTIC = False
-    USE_DOUBLE = False
+    USE_DOUBLE = True
 
 if __name__ == "__main__":
     launcher.launch(sys.argv[1:], Defaults, __doc__)

@@ -139,6 +139,10 @@ def process_args(args, defaults, description):
                         type=bool, default=defaults.CUDNN_DETERMINISTIC,
                         help=('Whether to use deterministic backprop. ' +
                               '(default: %(default)s)'))
+    parser.add_argument('--use_double', dest="use_double",
+                        type=bool, default=defaults.USE_DOUBLE,
+                        help=('Whether to use Double DQN. ' +
+                              '(default: %(default)s)'))    
     parser.add_argument('--experiment-directory', dest="experiment_directory", 
         default=None,
         help=('Specify exact directory where to save output to ' +
@@ -257,6 +261,7 @@ def launch(args, defaults, description):
                                          parameters.momentum,
                                          parameters.clip_delta,
                                          parameters.freeze_interval,
+                                         parameters.use_double,
                                          parameters.batch_size,
                                          parameters.network_type,
                                          parameters.update_rule,
