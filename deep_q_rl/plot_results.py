@@ -116,8 +116,17 @@ def main(args):
 
     setupLogging(parameters.verbosity)
 
-    column_indices, results = read_data(os.path.expanduser(parameters.results[0]))
+    results_filename = os.path.expanduser(parameters.results[0])
+    if not os.path.isfile(results_filename) and os.path.isdir(results_filename) and os.path.isfile(os.path.join(results_filename, 'results.csv')):
+        # They pointed to the directory instead of the filename
+        results_filename = os.path.join(results_filename, 'results.csv')
+
+    column_indices, results = read_data(results_filename)
     plot(results, column_indices, parameters.plotQValues, parameters.plotMaxValues, parameters.game_name)
+
+    logging.info("Max average score on epoch %s: %s" % (np.argmax(results[:, column_indices['reward_per_epoch']]) + 1, np.max(results[:, column_indices['reward_per_epoch']])))
+    if 'best_reward' in column_indices:
+        logging.info("Best score on epoch %s: %s" % (np.argmax(results[:, column_indices['best_reward']]) + 1, np.max(results[:, column_indices['best_reward']])))
 
     logging.info("Average score after %d epochs: %s" % (parameters.trained_epoch, np.mean(results[parameters.trained_epoch:, column_indices['reward_per_epoch']])))
 
