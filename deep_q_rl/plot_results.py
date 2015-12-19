@@ -17,13 +17,17 @@ DefaultTrainedEpoch = 100
 
 def read_data(filename):
     input_file = open(filename, "rb")
-    results = np.loadtxt(input_file, delimiter=",", skiprows=1)
+    header = input_file.readline().strip().split(',')
+    columns = {}
+    for index, column in enumerate(header):
+        columns[column] = index
+    results = np.loadtxt(input_file, delimiter=",")
     input_file.close()
 
-    return results
+    return columns, results
 
 
-def plot(results, plot_q_values, plot_max_values, game_name):
+def plot(results, column_indices, plot_q_values, plot_max_values, game_name):
     # Modify this to do some smoothing...
     kernel = np.array([1.] * 1)
     kernel = kernel / np.sum(kernel)
@@ -31,13 +35,21 @@ def plot(results, plot_q_values, plot_max_values, game_name):
     plot_count = 1
 
     if plot_q_values:
-        plot_count += 1
+        if 'mean_q' not in column_indices:
+            logging.warn("No mean Q value in results. Skipping")
+            plot_q_values = False
+        else:
+            plot_count += 1
 
     if plot_max_values:
-        plot_count += 1
+        if 'best_reward' not in column_indices:
+            logging.warn("No max reward per epoch in results. Skipping")
+            plot_max_values = False
+        else:
+            plot_count += 1
 
     scores = plt.subplot(1, plot_count, 1)
-    plt.plot(results[:, 0], np.convolve(results[:, 3], kernel, mode='same'), '-*')
+    plt.plot(results[:, column_indices['epoch']], np.convolve(results[:, column_indices['reward_per_epoch']], kernel, mode='same'), '-*')
     scores.set_xlabel('epoch')
     scores.set_ylabel('score')
 
@@ -47,7 +59,7 @@ def plot(results, plot_q_values, plot_max_values, game_name):
         
         max_values = plt.subplot(1, plot_count, current_sub_plot)
         current_sub_plot += 1
-        plt.plot(results[:, 0], results[:, 4], 'r-.')
+        plt.plot(results[:, column_indices['epoch']], results[:, column_indices['best_reward']], 'r-.')
         max_values.set_xlabel('epoch')
         max_values.set_ylabel('Max score')
         y_limits = max_values.get_ylim()
@@ -57,7 +69,7 @@ def plot(results, plot_q_values, plot_max_values, game_name):
     if plot_q_values:
         qvalues = plt.subplot(1, plot_count, current_sub_plot)
         current_sub_plot += 1
-        plt.plot(results[:, 0], results[:, 5], '-')
+        plt.plot(results[:, column_indices['epoch']], results[:, column_indices['mean_q']], '-')
         qvalues.set_xlabel('epoch')
         qvalues.set_ylabel('Q value')
 
@@ -104,10 +116,10 @@ def main(args):
 
     setupLogging(parameters.verbosity)
 
-    results = read_data(os.path.expanduser(parameters.results[0]))
-    plot(results, parameters.plotQValues, parameters.plotMaxValues, parameters.game_name)
+    column_indices, results = read_data(os.path.expanduser(parameters.results[0]))
+    plot(results, column_indices, parameters.plotQValues, parameters.plotMaxValues, parameters.game_name)
 
-    logging.info("Average score after %d epochs: %s" % (parameters.trained_epoch, np.mean(results[parameters.trained_epoch:, 3])))
+    logging.info("Average score after %d epochs: %s" % (parameters.trained_epoch, np.mean(results[parameters.trained_epoch:, column_indices['reward_per_epoch']])))
 
     return 0
 
