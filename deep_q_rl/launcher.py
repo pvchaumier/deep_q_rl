@@ -31,7 +31,7 @@ def process_args(args, defaults, description):
     parser.add_argument('-r', '--rom', dest="rom", default=defaults.ROM,
                         help='ROM to run (default: %(default)s)')
     parser.add_argument('-m', '--mode', dest="mode", default=defaults.MODE,
-                        help='MODE to playé (default: %(default)s)')
+                        help='MODE to play (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int,
                         default=defaults.EPOCHS,
                         help='Number of training epochs (default: %(default)s)')
