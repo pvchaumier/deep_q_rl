@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+
 """This script handles reading command line arguments and starting the
 training process.  It shouldn't be executed directly; it is used by
 run_nips.py or run_nature.py.
@@ -29,6 +30,8 @@ def process_args(args, defaults, description):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-r', '--rom', dest="rom", default=defaults.ROM,
                         help='ROM to run (default: %(default)s)')
+    parser.add_argument('-m', '--mode', dest="mode", default=defaults.MODE,
+                        help='MODE to playé (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int,
                         default=defaults.EPOCHS,
                         help='Number of training epochs (default: %(default)s)')
@@ -142,20 +145,20 @@ def process_args(args, defaults, description):
     parser.add_argument('--use_double', dest="use_double",
                         type=bool, default=defaults.USE_DOUBLE,
                         help=('Whether to use Double DQN. ' +
-                              '(default: %(default)s)'))    
-    parser.add_argument('--experiment-directory', dest="experiment_directory", 
+                              '(default: %(default)s)'))
+    parser.add_argument('--experiment-directory', dest="experiment_directory",
         default=None,
         help=('Specify exact directory where to save output to ' +
             '(default: combination of prefix and game name and current ' +
-            'date and parameters)'))    
-    parser.add_argument('--no-record', dest="recording", default=True, 
+            'date and parameters)'))
+    parser.add_argument('--no-record', dest="recording", default=True,
         action="store_false",
         help=('Do not record anything about the experiment ' +
             '(best games, epoch networks, test results, etc)'))
-    parser.add_argument('--record-video', dest="record_video", 
+    parser.add_argument('--record-video', dest="record_video",
         default=False, action="store_true",
         help='Record screen captures')
-    parser.add_argument('--episodes', dest="episodes", default=False, 
+    parser.add_argument('--episodes', dest="episodes", default=False,
         action="store_true",
         help=('This changes the lengths of training epochs and test ' +
         'epochs to be measured in episodes (games) instead of steps'))
@@ -201,6 +204,10 @@ def launch(args, defaults, description):
         rom = "%s.bin" % parameters.rom
     full_rom_path = os.path.join(defaults.BASE_ROM_PATH, rom)
 
+    mode = 1
+    if parameters.mode.isnumeric():
+        mode = parameters.mode
+
     if parameters.deterministic:
         rng = np.random.RandomState(123456)
     else:
@@ -212,7 +219,7 @@ def launch(args, defaults, description):
 
     if parameters.experiment_directory:
         experiment_directory = parameters.experiment_directory
-    else:    
+    else:
         time_str = time.strftime("_%Y-%m-%d-%H-%M")
         experiment_directory = parameters.experiment_prefix + time_str
 
@@ -248,6 +255,8 @@ def launch(args, defaults, description):
     ale.loadROM(full_rom_path)
 
     num_actions = len(ale.getMinimalActionSet())
+
+    ale.setMode(mode)
 
     if parameters.nn_file is None:
         network = q_network.DeepQLearner(defaults.RESIZED_WIDTH,
@@ -296,7 +305,6 @@ def launch(args, defaults, description):
                                               length_in_episodes=parameters.episodes)
 
     experiment.run()
-
 
 
 if __name__ == '__main__':
