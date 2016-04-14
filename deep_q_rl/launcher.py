@@ -6,7 +6,7 @@ run_nips.py or run_nature.py.
 
 """
 import os, sys
-sys.append.path('../../Arcade-Learning-Environment/')
+sys.path.append('../../Arcade-Learning-Environment/')
 
 import argparse
 import logging
