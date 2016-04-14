@@ -6,6 +6,8 @@ run_nips.py or run_nature.py.
 
 """
 import os, sys
+sys.append.path('../../Arcade-Learning-Environment/')
+
 import argparse
 import logging
 import time
@@ -204,7 +206,6 @@ def launch(args, defaults, description):
         rom = "%s.bin" % parameters.rom
     full_rom_path = os.path.join(defaults.BASE_ROM_PATH, rom)
 
-    mode = 1
     if parameters.mode.isnumeric():
         mode = parameters.mode
 
