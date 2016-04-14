@@ -206,8 +206,9 @@ def launch(args, defaults, description):
         rom = "%s.bin" % parameters.rom
     full_rom_path = os.path.join(defaults.BASE_ROM_PATH, rom)
 
-    if parameters.mode.isnumeric():
-        mode = parameters.mode
+    param_mode = unicode(parameters.mode, 'utf-8')
+    if param_mode.isnumeric():
+        mode = int(param_mode)
 
     if parameters.deterministic:
         rng = np.random.RandomState(123456)
