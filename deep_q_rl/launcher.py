@@ -223,7 +223,7 @@ def launch(args, defaults, description):
         experiment_directory = parameters.experiment_directory
     else:
         time_str = time.strftime("_%Y-%m-%d-%H-%M")
-        experiment_directory = parameters.experiment_prefix + time_str 
+        experiment_directory = parameters.experiment_prefix + time_str \
                                    + '_mode_' + mode
 
 
