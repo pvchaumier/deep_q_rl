@@ -224,7 +224,7 @@ def launch(args, defaults, description):
     else:
         time_str = time.strftime("_%Y-%m-%d-%H-%M")
         experiment_directory = parameters.experiment_prefix + time_str \
-                                   + '_mode_' + mode
+                                   + '_mode_' + str(mode)
 
 
     ale = ale_python_interface.ALEInterface()
