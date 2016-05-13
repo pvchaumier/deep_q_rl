@@ -22,7 +22,7 @@ class Defaults:
     # ----------------------
     # ALE Parameters
     # ----------------------
-    BASE_ROM_PATH = "../roms/"
+    BASE_ROM_PATH = "../../roms/"
     ROM = 'breakout.bin'
     MODE = 1
     FRAME_SKIP = 4
