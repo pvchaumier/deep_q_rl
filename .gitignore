@@ -1,2 +1,3 @@
 *.pyc
 roms
+deep_q_rl/breakout_super_*
