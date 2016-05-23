@@ -51,7 +51,7 @@ class Defaults:
     UPDATE_FREQUENCY = 4
     REPLAY_MEMORY_SIZE = 1000000
     BATCH_SIZE = 32
-    NETWORK_TYPE = "nature_dnn"
+    NETWORK_TYPE = 'nature_dnn'
     FREEZE_INTERVAL = 10000
     REPLAY_START_SIZE = 50000
     RESIZE_METHOD = 'scale'
