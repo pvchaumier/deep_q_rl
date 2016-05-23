@@ -197,4 +197,3 @@ class ALEExperiment(object):
                               interpolation=cv2.INTER_LINEAR)
         else:
             raise ValueError('Unrecognized image resize method.')
-

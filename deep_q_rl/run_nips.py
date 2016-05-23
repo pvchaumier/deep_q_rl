@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+# ! /usr/bin/env python
 """
 Execute a training run of deep-Q-Leaning with parameters that
 are consistent with:
@@ -22,14 +22,14 @@ class Defaults:
     # ----------------------
     # ALE Parameters
     # ----------------------
-    BASE_ROM_PATH = "../../roms/"
-    ROM = 'breakout.bin'
+    BASE_ROM_PATH = '../../roms/'
+    ROM = 'breakout_super.bin'
     MODE = 1
     FRAME_SKIP = 4
     REPEAT_ACTION_PROBABILITY = 0
 
     # ----------------------
-    # Agent/Network parameters:
+    # Agent/Network Parameters
     # ----------------------
     UPDATE_RULE = 'rmsprop'
     BATCH_ACCUMULATOR = 'mean'
@@ -46,7 +46,7 @@ class Defaults:
     UPDATE_FREQUENCY = 1
     REPLAY_MEMORY_SIZE = 1000000
     BATCH_SIZE = 32
-    NETWORK_TYPE = "nips_dnn"
+    NETWORK_TYPE = 'nips_dnn'
     FREEZE_INTERVAL = -1
     REPLAY_START_SIZE = 100
     RESIZE_METHOD = 'crop'
@@ -58,5 +58,13 @@ class Defaults:
     CUDNN_DETERMINISTIC = False
     USE_DOUBLE = False
 
-if __name__ == "__main__":
+
+    # EPOCHS = 1
+    # LEARNING_RATE = 0
+    # EPSILON_START = 0
+    # EPSILON_MIN = 0
+    # EPSILON_DECAY = 0
+
+
+if __name__ == '__main__':
     launcher.launch(sys.argv[1:], Defaults, __doc__)
