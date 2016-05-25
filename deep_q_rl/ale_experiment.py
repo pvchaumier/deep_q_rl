@@ -114,8 +114,8 @@ class ALEExperiment(object):
 
         self.ale.getScreenGrayscale(self.screen_buffer[index, ...])
 
-        screen_buffer[index,...][screen_buffer[index,...] == 122] = 85
-        screen_buffer[index,...][screen_buffer[index,...] == 172] = 104
+        self.screen_buffer[index,...][self.screen_buffer[index,...] == 122] = 85
+        self.screen_buffer[index,...][self.screen_buffer[index,...] == 172] = 104
 
         self.buffer_count += 1
         return reward
