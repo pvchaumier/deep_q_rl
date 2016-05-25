@@ -6,6 +6,19 @@ are consistent with:
 Playing Atari with Deep Reinforcement Learning
 NIPS Deep Learning Workshop 2013
 
+
+
+/!\ HERE ARE ALL THE EXPLANATION OF THE MODIFICATION I DID TO TEST /!\
+
+Most of the modifications are in ale_experiment.
+
+Basically, what I did was replace the concept of epoch by the concept of 
+episode. Because renaming is a bit painful, I just left epoch but if you read 
+the code, please remember that you should always replace it by episode in the 
+nips and nature paper sense !
+
+
+
 """
 
 import launcher
@@ -52,7 +65,7 @@ class Defaults:
     RESIZE_METHOD = 'crop'
     RESIZED_WIDTH = 84
     RESIZED_HEIGHT = 84
-    DEATH_ENDS_EPISODE = 'false'
+    DEATH_ENDS_EPISODE = 'true'
     MAX_START_NULLOPS = 0
     DETERMINISTIC = True
     CUDNN_DETERMINISTIC = False

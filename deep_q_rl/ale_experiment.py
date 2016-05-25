@@ -52,13 +52,9 @@ class ALEExperiment(object):
         is conducted after each training epoch.
         """
         for epoch in range(1, self.num_epochs + 1):
-            self.run_epoch(epoch, self.epoch_length)
-            self.agent.finish_epoch(epoch)
-
-            if self.test_length > 0:
-                self.agent.start_testing()
-                self.run_epoch(epoch, self.test_length, True)
-                self.agent.finish_testing(epoch)
+            self.agent.start_testing()
+            self.run_epoch(epoch, self.test_length, True)
+            self.agent.finish_testing(epoch)
         self.agent.cleanup()
 
     def run_epoch(self, epoch, num_steps, testing=False):
@@ -74,13 +70,12 @@ class ALEExperiment(object):
         """
         self.terminal_lol = False # Make sure each epoch starts with a reset.
         steps_left = num_steps
-        while steps_left > 0:
-            prefix = "testing" if testing else "training"
-            logging.info(prefix + " epoch: " + str(epoch) + " steps_left: " +
-                         str(steps_left))
-            _, num_steps = self.run_episode(steps_left, testing)
+        prefix = "testing" if testing else "training"
+        logging.info(prefix + " epoch: " + str(epoch) + " steps_left: " +
+                     str(steps_left))
+        _, num_steps = self.run_episode(steps_left, testing)
 
-            steps_left -= num_steps
+        steps_left -= num_steps
 
 
     def _init_episode(self):
