@@ -265,7 +265,7 @@ def launch(args, defaults, description):
         print('You need to specify a neural network file.')
         return
     else:
-        nn_number = int(''.join([c for c in nn_file if c.isdigit()]))
+        nn_number = int(''.join([c for c in parameters.nn_file if c.isdigit()]))
         handle = open(parameters.nn_file, 'r')
         network = cPickle.load(handle)
 
