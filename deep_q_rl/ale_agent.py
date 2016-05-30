@@ -22,8 +22,8 @@ class NeuralAgent(object):
 
     def __init__(self, q_network, epsilon_start, epsilon_min,
                  epsilon_decay, replay_memory_size, experiment_directory,
-                 replay_start_size, update_frequency, rng, 
-                 recording=True):
+                 replay_start_size, update_frequency, rng,
+                 recording=True, nn_number=None):
 
         self.results_file = self.learning_file = None
         self.best_epoch_reward = None
@@ -42,6 +42,7 @@ class NeuralAgent(object):
         self.image_height = self.network.input_height
 
         self.recording = recording
+        self.nn_number = nn_number
 
         self.exp_dir = experiment_directory
         if self.recording:
@@ -93,8 +94,12 @@ class NeuralAgent(object):
     def _open_results_file(self):
         if not self.recording:
             return
-        logging.info("OPENING " + self.exp_dir + '/results.csv')
-        self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
+        if self.nn_number:
+            logging.info("OPENING " + self.exp_dir + '/results' + str(nn_number) + '.csv')
+            self.results_file = open(self.exp_dir + '/results' + str(nn_number) + '.csv', 'w', 0)
+        else:
+            logging.info("OPENING " + self.exp_dir + '/results.csv')
+            self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
         self.results_file.write(\
             'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q\n')
         self.results_file.flush()

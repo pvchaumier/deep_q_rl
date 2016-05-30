@@ -224,8 +224,7 @@ def launch(args, defaults, description):
         experiment_directory = parameters.experiment_directory
     else:
         time_str = time.strftime("_%Y-%m-%d-%H-%M")
-        experiment_directory = parameters.experiment_prefix + time_str \
-                                   + '_mode_' + str(mode)
+        experiment_directory = parameters.experiment_prefix + '_test_mode_' + str(mode)
 
 
     ale = ale_python_interface.ALEInterface()
@@ -263,24 +262,10 @@ def launch(args, defaults, description):
     ale.setMode(mode)
 
     if parameters.nn_file is None:
-        network = q_network.DeepQLearner(defaults.RESIZED_WIDTH,
-                                         defaults.RESIZED_HEIGHT,
-                                         num_actions,
-                                         parameters.phi_length,
-                                         parameters.discount,
-                                         parameters.learning_rate,
-                                         parameters.rms_decay,
-                                         parameters.rms_epsilon,
-                                         parameters.momentum,
-                                         parameters.clip_delta,
-                                         parameters.freeze_interval,
-                                         parameters.use_double,
-                                         parameters.batch_size,
-                                         parameters.network_type,
-                                         parameters.update_rule,
-                                         parameters.batch_accumulator,
-                                         rng)
+        print('You need to specify a neural network file.')
+        return
     else:
+        nn_number = int(''.join([c for c in nn_file if c.isdigit()]))
         handle = open(parameters.nn_file, 'r')
         network = cPickle.load(handle)
 
@@ -293,7 +278,8 @@ def launch(args, defaults, description):
                                   parameters.replay_start_size,
                                   parameters.update_frequency,
                                   rng,
-                                  recording=parameters.recording)
+                                  recording=parameters.recording,
+                                  nn_number=nn_number)
 
     experiment = ale_experiment.ALEExperiment(ale, agent,
                                               defaults.RESIZED_WIDTH,
