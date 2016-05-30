@@ -95,8 +95,8 @@ class NeuralAgent(object):
         if not self.recording:
             return
         if self.nn_number:
-            logging.info("OPENING " + self.exp_dir + '/results' + str(nn_number) + '.csv')
-            self.results_file = open(self.exp_dir + '/results' + str(nn_number) + '.csv', 'w', 0)
+            logging.info("OPENING " + self.exp_dir + '/results' + str(self.nn_number) + '.csv')
+            self.results_file = open(self.exp_dir + '/results' + str(self.nn_number) + '.csv', 'w', 0)
         else:
             logging.info("OPENING " + self.exp_dir + '/results.csv')
             self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
