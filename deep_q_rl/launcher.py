@@ -219,12 +219,21 @@ def launch(args, defaults, description):
     if parameters.cudnn_deterministic:
         theano.config.dnn.conv.algo_bwd = 'deterministic'
 
+    if parameters.nn_file is None:
+        print('You need to specify a neural network file.')
+        return
+    else:
+        nn_number = int(''.join([c for c in parameters.nn_file.split('/')[-1] if c.isdigit()]))
+        handle = open(parameters.nn_file, 'r')
+        network = cPickle.load(handle)
+
 
     if parameters.experiment_directory:
         experiment_directory = parameters.experiment_directory
     else:
         time_str = time.strftime("_%Y-%m-%d-%H-%M")
-        experiment_directory = parameters.experiment_prefix + '_test_mode_' + str(mode)
+        origin_mode = int(''.join([c for c in parameters.nn_file.split('/')[-2] if c.isdigit()]))
+        experiment_directory = parameters.experiment_prefix + '_test_mode_' + str(mode) + '_on_mode_' + str(origin_mode)
 
 
     ale = ale_python_interface.ALEInterface()
@@ -261,14 +270,7 @@ def launch(args, defaults, description):
 
     ale.setMode(mode)
 
-    if parameters.nn_file is None:
-        print('You need to specify a neural network file.')
-        return
-    else:
-        nn_number = int(''.join([c for c in parameters.nn_file.split('/')[-1] if c.isdigit()]))
-        handle = open(parameters.nn_file, 'r')
-        network = cPickle.load(handle)
-
+    
     agent = ale_agent.NeuralAgent(network,
                                   parameters.epsilon_start,
                                   parameters.epsilon_min,
