@@ -32,8 +32,10 @@ def process_args(args, defaults, description):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-r', '--rom', dest="rom", default=defaults.ROM,
                         help='ROM to run (default: %(default)s)')
-    parser.add_argument('-m', '--mode', dest="mode", default=defaults.MODE,
-                        help='MODE to play (default: %(default)s)')
+    parser.add_argument('-m1', '--mode1', dest="mode1", default=defaults.MODE,
+                        help='MODE 1 to play (default: %(default)s)')
+    parser.add_argument('-m2', '--mode2', dest="mode2", default=defaults.MODE,
+                        help='MODE 2 to play (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int,
                         default=defaults.EPOCHS,
                         help='Number of training epochs (default: %(default)s)')
@@ -207,9 +209,13 @@ def launch(args, defaults, description):
     full_rom_path = os.path.join(defaults.BASE_ROM_PATH, rom)
 
     try:
-      mode = int(parameters.mode)
+      mode1 = int(parameters.mode1)
     except ValueError:
-      mode = 1
+      mode1 = 1
+    try:
+      mode2 = int(parameters.mode2)
+    except ValueError:
+      mode2 = 1
 
     if parameters.deterministic:
         rng = np.random.RandomState(123456)
@@ -224,8 +230,7 @@ def launch(args, defaults, description):
         experiment_directory = parameters.experiment_directory
     else:
         time_str = time.strftime("_%Y-%m-%d-%H-%M")
-        experiment_directory = parameters.experiment_prefix + time_str \
-                                   + '_mode_' + str(mode)
+        experiment_directory = parameters.experiment_prefix + time_str 
 
 
     ale = ale_python_interface.ALEInterface()
@@ -259,6 +264,11 @@ def launch(args, defaults, description):
     ale.loadROM(full_rom_path)
 
     num_actions = len(ale.getMinimalActionSet())
+
+
+# 
+#   CHANGE FROM HERE
+# 
 
     ale.setMode(mode)
 
