@@ -32,10 +32,6 @@ def process_args(args, defaults, description):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-r', '--rom', dest="rom", default=defaults.ROM,
                         help='ROM to run (default: %(default)s)')
-    parser.add_argument('-m1', '--mode1', dest="mode1", default=defaults.MODE,
-                        help='MODE 1 to play (default: %(default)s)')
-    parser.add_argument('-m2', '--mode2', dest="mode2", default=defaults.MODE,
-                        help='MODE 2 to play (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int,
                         default=defaults.EPOCHS,
                         help='Number of training epochs (default: %(default)s)')
@@ -208,15 +204,6 @@ def launch(args, defaults, description):
         rom = "%s.bin" % parameters.rom
     full_rom_path = os.path.join(defaults.BASE_ROM_PATH, rom)
 
-    try:
-      mode1 = int(parameters.mode1)
-    except ValueError:
-      mode1 = 1
-    try:
-      mode2 = int(parameters.mode2)
-    except ValueError:
-      mode2 = 1
-
     if parameters.deterministic:
         rng = np.random.RandomState(123456)
     else:
@@ -269,8 +256,6 @@ def launch(args, defaults, description):
 # 
 #   CHANGE FROM HERE
 # 
-
-    ale.setMode(mode)
 
     if parameters.nn_file is None:
         network = q_network.DeepQLearner(defaults.RESIZED_WIDTH,

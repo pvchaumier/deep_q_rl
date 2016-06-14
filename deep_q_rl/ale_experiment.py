@@ -52,6 +52,10 @@ class ALEExperiment(object):
         is conducted after each training epoch.
         """
         for epoch in range(1, self.num_epochs + 1):
+            if epoch % 2 == 0:
+                self.ale.setMode(1)
+            else:
+                self.ale.setMode(3)
             self.run_epoch(epoch, self.epoch_length)
             self.agent.finish_epoch(epoch)
 
