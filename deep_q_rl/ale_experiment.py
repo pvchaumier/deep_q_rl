@@ -15,12 +15,14 @@ CROP_OFFSET = 8
 
 
 class ALEExperiment(object):
-    def __init__(self, ale, agent, resized_width, resized_height,
+    def __init__(self, ale, agent1, agent3, resized_width, resized_height,
                  resize_method, num_epochs, epoch_length, test_length,
                  frame_skip, death_ends_episode, max_start_nullops, rng,
                  length_in_episodes=False):
         self.ale = ale
-        self.agent = agent
+        self.agent1 = agent1
+        self.agent3 = agent3
+        self.mode = 1
         self.num_epochs = num_epochs
         self.epoch_length = epoch_length
         self.test_length = test_length
@@ -42,9 +44,9 @@ class ALEExperiment(object):
         self.max_start_nullops = max_start_nullops
         self.rng = rng
 
-        # Whether the lengths (test_length and epoch_length) are specified in 
+        # Whether the lengths (test_length and epoch_length) are specified in
         # episodes. This is mainly for testing
-        self.length_in_episodes = length_in_episodes 
+        self.length_in_episodes = length_in_episodes
 
     def run(self):
         """
@@ -54,16 +56,23 @@ class ALEExperiment(object):
         for epoch in range(1, self.num_epochs + 1):
             if epoch % 2 == 0:
                 self.ale.setMode(1)
+                self.mode = 1
             else:
                 self.ale.setMode(3)
+                self.mode = 3
+
             self.run_epoch(epoch, self.epoch_length)
-            self.agent.finish_epoch(epoch)
+            self.agent1.finish_epoch(epoch)
+            self.agent3.finish_epoch(epoch)
 
             if self.test_length > 0:
-                self.agent.start_testing()
+                self.agent1.start_testing()
+                self.agent3.start_testing()
                 self.run_epoch(epoch, self.test_length, True)
-                self.agent.finish_testing(epoch)
-        self.agent.cleanup()
+                self.agent1.finish_testing(epoch)
+                self.agent3.finish_testing(epoch)
+        self.agent1.cleanup()
+        self.agent3.cleanup()
 
     def run_epoch(self, epoch, num_steps, testing=False):
         """ Run one 'epoch' of training or testing, where an epoch is defined
@@ -149,20 +158,40 @@ class ALEExperiment(object):
 
         start_lives = self.ale.lives()
 
-        action = self.agent.start_episode(self.get_observation())
-        num_steps = 0
-        while True:
-            reward = self._step(self.min_action_set[action])
-            self.terminal_lol = (self.death_ends_episode and not testing and
-                                 self.ale.lives() < start_lives)
-            terminal = self.ale.game_over() or self.terminal_lol
-            num_steps += 1
+        if self.mode == 1:
 
-            if terminal or num_steps >= max_steps and not self.length_in_episodes:
-                self.agent.end_episode(reward, terminal)
-                break
+            action = self.agent1.start_episode(self.get_observation())
+            num_steps = 0
+            while True:
+                reward = self._step(self.min_action_set[action])
+                self.terminal_lol = (self.death_ends_episode and not testing and
+                                     self.ale.lives() < start_lives)
+                terminal = self.ale.game_over() or self.terminal_lol
+                num_steps += 1
 
-            action = self.agent.step(reward, self.get_observation())
+                if terminal or num_steps >= max_steps and not self.length_in_episodes:
+                    self.agent1.end_episode(reward, terminal)
+                    break
+
+                action = self.agent1.step(reward, self.get_observation())
+
+        else:
+            
+            action = self.agent3.start_episode(self.get_observation())
+            num_steps = 0
+            while True:
+                reward = self._step(self.min_action_set[action])
+                self.terminal_lol = (self.death_ends_episode and not testing and
+                                     self.ale.lives() < start_lives)
+                terminal = self.ale.game_over() or self.terminal_lol
+                num_steps += 1
+
+                if terminal or num_steps >= max_steps and not self.length_in_episodes:
+                    self.agent3.end_episode(reward, terminal)
+                    break
+
+                action = self.agent3.step(reward, self.get_observation())
+
 
         # if the lengths are in episodes, this episode counts as 1 "step"
         if self.length_in_episodes:

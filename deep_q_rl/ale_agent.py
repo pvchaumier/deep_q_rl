@@ -23,7 +23,7 @@ class NeuralAgent(object):
     def __init__(self, q_network, epsilon_start, epsilon_min,
                  epsilon_decay, replay_memory_size, experiment_directory,
                  replay_start_size, update_frequency, rng, 
-                 recording=True):
+                 recording=True, mode=1):
 
         self.results_file = self.learning_file = None
         self.best_epoch_reward = None
@@ -42,6 +42,7 @@ class NeuralAgent(object):
         self.image_height = self.network.input_height
 
         self.recording = recording
+        self.mode = mode
 
         self.exp_dir = experiment_directory
         if self.recording:
@@ -93,8 +94,10 @@ class NeuralAgent(object):
     def _open_results_file(self):
         if not self.recording:
             return
-        logging.info("OPENING " + self.exp_dir + '/results.csv')
-        self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
+        logging.info("OPENING " + self.exp_dir + '/results_mode_' + \
+                     str(self.mode) +'.csv')
+        self.results_file = open(self.exp_dir + '/results_mode_' + \
+                     str(self.mode) +'.csv', 'w', 0)
         self.results_file.write(\
             'epoch,num_episodes,total_reward,reward_per_epoch,best_reward,mean_q\n')
         self.results_file.flush()
@@ -102,7 +105,8 @@ class NeuralAgent(object):
     def _open_learning_file(self):
         if not self.recording:
             return
-        self.learning_file = open(self.exp_dir + '/learning.csv', 'w', 0)
+        self.learning_file = open(self.exp_dir + '/learning_mode_' + \
+                     str(self.mode) +'.csv', 'w', 0)
         self.learning_file.write('mean_loss,epsilon\n')
         self.learning_file.flush()
 
@@ -313,7 +317,7 @@ class NeuralAgent(object):
         if not self.recording:
             return
         net_file = open(self.exp_dir + '/network_file_' + str(epoch) + \
-                        '.pkl', 'w')
+                        '_mode_' + str(self.mode) + '.pkl', 'w')
         cPickle.dump(self.network, net_file, -1)
         net_file.close()
 

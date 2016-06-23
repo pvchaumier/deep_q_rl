@@ -25,6 +25,8 @@ class DeepQLearner:
     Deep Q-learning network using Lasagne.
     """
 
+    l_hidden = None
+
     def __init__(self, input_width, input_height, num_actions,
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
@@ -164,26 +166,9 @@ class DeepQLearner:
 
     def build_network(self, network_type, input_width, input_height,
                       output_dim, num_frames, batch_size):
-        if network_type == "nature_cuda":
-            return self.build_nature_network(input_width, input_height,
-                                             output_dim, num_frames, batch_size)
-        if network_type == "nature_dnn":
-            return self.build_nature_network_dnn(input_width, input_height,
-                                                 output_dim, num_frames,
-                                                 batch_size)
-        elif network_type == "nips_cuda":
-            return self.build_nips_network(input_width, input_height,
-                                           output_dim, num_frames, batch_size)
-        elif network_type == "nips_dnn":
-            return self.build_nips_network_dnn(input_width, input_height,
-                                               output_dim, num_frames,
-                                               batch_size)
-        elif network_type == "linear":
-            return self.build_linear_network(input_width, input_height,
-                                             output_dim, num_frames, batch_size)
-        else:
-            raise ValueError("Unrecognized network: {}".format(network_type))
-
+        return self.build_nips_network_dnn(input_width, input_height,
+                                           output_dim, num_frames,
+                                           batch_size)
 
 
     def train(self, states, actions, rewards, next_states, terminals):
@@ -231,175 +216,56 @@ class DeepQLearner:
         all_params = lasagne.layers.helper.get_all_param_values(self.l_out)
         lasagne.layers.helper.set_all_param_values(self.next_l_out, all_params)
 
-    def build_nature_network(self, input_width, input_height, output_dim,
-                             num_frames, batch_size):
-        """
-        Build a large network consistent with the DeepMind Nature paper.
-        """
-        from lasagne.layers import cuda_convnet
-
-        l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
-        )
-
-        l_conv1 = cuda_convnet.Conv2DCCLayer(
-            l_in,
-            num_filters=32,
-            filter_size=(8, 8),
-            stride=(4, 4),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(), # Defaults to Glorot
-            b=lasagne.init.Constant(.1),
-            dimshuffle=True
-        )
-
-        l_conv2 = cuda_convnet.Conv2DCCLayer(
-            l_conv1,
-            num_filters=64,
-            filter_size=(4, 4),
-            stride=(2, 2),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1),
-            dimshuffle=True
-        )
-
-        l_conv3 = cuda_convnet.Conv2DCCLayer(
-            l_conv2,
-            num_filters=64,
-            filter_size=(3, 3),
-            stride=(1, 1),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1),
-            dimshuffle=True
-        )
-
-        l_hidden1 = lasagne.layers.DenseLayer(
-            l_conv3,
-            num_units=512,
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_out = lasagne.layers.DenseLayer(
-            l_hidden1,
-            num_units=output_dim,
-            nonlinearity=None,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        return l_out
-
-
-    def build_nature_network_dnn(self, input_width, input_height, output_dim,
-                                 num_frames, batch_size):
-        """
-        Build a large network consistent with the DeepMind Nature paper.
-        """
-        from lasagne.layers import dnn
-
-        l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
-        )
-
-        l_conv1 = dnn.Conv2DDNNLayer(
-            l_in,
-            num_filters=32,
-            filter_size=(8, 8),
-            stride=(4, 4),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_conv2 = dnn.Conv2DDNNLayer(
-            l_conv1,
-            num_filters=64,
-            filter_size=(4, 4),
-            stride=(2, 2),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_conv3 = dnn.Conv2DDNNLayer(
-            l_conv2,
-            num_filters=64,
-            filter_size=(3, 3),
-            stride=(1, 1),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_hidden1 = lasagne.layers.DenseLayer(
-            l_conv3,
-            num_units=512,
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_out = lasagne.layers.DenseLayer(
-            l_hidden1,
-            num_units=output_dim,
-            nonlinearity=None,
-            W=lasagne.init.HeUniform(),
-            b=lasagne.init.Constant(.1)
-        )
-
-        return l_out
-
-
-
     def build_nips_network(self, input_width, input_height, output_dim,
                            num_frames, batch_size):
         """
         Build a network consistent with the 2013 NIPS paper.
         """
-        from lasagne.layers import cuda_convnet
-        l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
-        )
 
-        l_conv1 = cuda_convnet.Conv2DCCLayer(
-            l_in,
-            num_filters=16,
-            filter_size=(8, 8),
-            stride=(4, 4),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            #W=lasagne.init.HeUniform(c01b=True),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1),
-            dimshuffle=True
-        )
+        if not DeepQLearner.l_hidden:
 
-        l_conv2 = cuda_convnet.Conv2DCCLayer(
-            l_conv1,
-            num_filters=32,
-            filter_size=(4, 4),
-            stride=(2, 2),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            #W=lasagne.init.HeUniform(c01b=True),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1),
-            dimshuffle=True
-        )
+            from lasagne.layers import cuda_convnet
+            l_in = lasagne.layers.InputLayer(
+                shape=(batch_size, num_frames, input_width, input_height)
+            )
 
-        l_hidden1 = lasagne.layers.DenseLayer(
-            l_conv2,
-            num_units=256,
-            nonlinearity=lasagne.nonlinearities.rectify,
-            #W=lasagne.init.HeUniform(),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1)
-        )
+            l_conv1 = cuda_convnet.Conv2DCCLayer(
+                l_in,
+                num_filters=16,
+                filter_size=(8, 8),
+                stride=(4, 4),
+                nonlinearity=lasagne.nonlinearities.rectify,
+                #W=lasagne.init.HeUniform(c01b=True),
+                W=lasagne.init.Normal(.01),
+                b=lasagne.init.Constant(.1),
+                dimshuffle=True
+            )
+
+            l_conv2 = cuda_convnet.Conv2DCCLayer(
+                l_conv1,
+                num_filters=32,
+                filter_size=(4, 4),
+                stride=(2, 2),
+                nonlinearity=lasagne.nonlinearities.rectify,
+                #W=lasagne.init.HeUniform(c01b=True),
+                W=lasagne.init.Normal(.01),
+                b=lasagne.init.Constant(.1),
+                dimshuffle=True
+            )
+
+            l_hidden1 = lasagne.layers.DenseLayer(
+                l_conv2,
+                num_units=256,
+                nonlinearity=lasagne.nonlinearities.rectify,
+                #W=lasagne.init.HeUniform(),
+                W=lasagne.init.Normal(.01),
+                b=lasagne.init.Constant(.1)
+            )
+
+            DeepQLearner.l_hidden = l_hidden1
 
         l_out = lasagne.layers.DenseLayer(
-            l_hidden1,
+            DeepQLearner.l_hidden,
             num_units=output_dim,
             nonlinearity=None,
             #W=lasagne.init.HeUniform(),
@@ -409,83 +275,6 @@ class DeepQLearner:
 
         return l_out
 
-
-    def build_nips_network_dnn(self, input_width, input_height, output_dim,
-                               num_frames, batch_size):
-        """
-        Build a network consistent with the 2013 NIPS paper.
-        """
-        # Import it here, in case it isn't installed.
-        from lasagne.layers import dnn
-
-        l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
-        )
-
-
-        l_conv1 = dnn.Conv2DDNNLayer(
-            l_in,
-            num_filters=16,
-            filter_size=(8, 8),
-            stride=(4, 4),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            #W=lasagne.init.HeUniform(),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_conv2 = dnn.Conv2DDNNLayer(
-            l_conv1,
-            num_filters=32,
-            filter_size=(4, 4),
-            stride=(2, 2),
-            nonlinearity=lasagne.nonlinearities.rectify,
-            #W=lasagne.init.HeUniform(),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_hidden1 = lasagne.layers.DenseLayer(
-            l_conv2,
-            num_units=256,
-            nonlinearity=lasagne.nonlinearities.rectify,
-            #W=lasagne.init.HeUniform(),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1)
-        )
-
-        l_out = lasagne.layers.DenseLayer(
-            l_hidden1,
-            num_units=output_dim,
-            nonlinearity=None,
-            #W=lasagne.init.HeUniform(),
-            W=lasagne.init.Normal(.01),
-            b=lasagne.init.Constant(.1)
-        )
-
-        return l_out
-
-
-    def build_linear_network(self, input_width, input_height, output_dim,
-                             num_frames, batch_size):
-        """
-        Build a simple linear learner.  Useful for creating
-        tests that sanity-check the weight update code.
-        """
-
-        l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
-        )
-
-        l_out = lasagne.layers.DenseLayer(
-            l_in,
-            num_units=output_dim,
-            nonlinearity=None,
-            W=lasagne.init.Constant(0.0),
-            b=None
-        )
-
-        return l_out
 
 def main():
     net = DeepQLearner(84, 84, 16, 4, .99, .00025, .95, .95, 10000, False,
