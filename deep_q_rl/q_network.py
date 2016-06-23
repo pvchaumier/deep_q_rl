@@ -222,16 +222,14 @@ class DeepQLearner:
         """
         Build a network consistent with the 2013 NIPS paper.
         """
+        # Import it here, in case it isn't installed.
+        from lasagne.layers import dnn
 
-        if not DeepQLearner.l_hidden:
-
-            # Import it here, in case it isn't installed.
-            from lasagne.layers import dnn
+        if DeepQLearner.l_hidden is None:
 
             l_in = lasagne.layers.InputLayer(
                 shape=(batch_size, num_frames, input_width, input_height)
             )
-
 
             l_conv1 = dnn.Conv2DDNNLayer(
                 l_in,
@@ -263,6 +261,8 @@ class DeepQLearner:
                 W=lasagne.init.Normal(.01),
                 b=lasagne.init.Constant(.1)
             )
+
+            DeepQLearner.l_hidden = l_hidden1
 
         l_out = lasagne.layers.DenseLayer(
             DeepQLearner.l_hidden,
